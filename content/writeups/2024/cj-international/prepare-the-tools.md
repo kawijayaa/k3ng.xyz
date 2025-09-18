@@ -1,0 +1,48 @@
+---
+icon: fingerprint
+---
+
+# prepare the tools
+
+### Challenge Description
+
+lets preparing our tools!
+
+### Flag
+
+`CJ{warm_up_for_your_scapy/pyshark/tshark}`
+
+***
+
+### Analysis
+
+We are given a packet capture file for us to analyze. From the capture, we can see that the client's payload will have a format of `flag[x]` where `x` is the index requested from the flag. The server's response will simply return the character requested.
+
+<figure><img src="../../.gitbook/assets/image (53).png" alt=""><figcaption><p>Snippet of TCP stream</p></figcaption></figure>
+
+### Solution
+
+From this information, we now need to create a script to parse the characters based on the index. Then the flag will be shown somewhere on the output.
+
+### Solver Script
+
+```python
+import re
+from scapy.all import *
+
+res = [""] * 10000
+packets = rdpcap("preparingtools.pcapng")
+index_found = False
+
+for p in packets:
+    if p.haslayer(TCP) and p.haslayer(Raw):
+        if p.getlayer(TCP).flags == 0x18:
+            if p.getlayer(Raw).load.startswith(b"flag["):
+                index = int(p.getlayer(Raw).load[5:-1].decode("utf-8"))
+                index_found = True
+            elif index_found:
+                  res[index] = p.getlayer(Raw).load.decode("utf-8")
+                  index_found = False
+
+print(re.findall(r"CJ{.*}", ''.join(res))[0])
+```

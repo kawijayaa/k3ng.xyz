@@ -1,0 +1,152 @@
+---
+icon: fingerprint
+---
+
+# Whale
+
+### Challenge Description
+
+Someone broke into our application server. Could you help to investigate what they did?
+
+[https://drive.google.com/file/d/1du2MDOLldM3d\_akDkIxypSStuaOSuDP6/view?usp=sharing](https://drive.google.com/file/d/1du2MDOLldM3d_akDkIxypSStuaOSuDP6/view?usp=sharing)
+
+Author: farisv
+
+### Flag
+
+`CJ{dae071f96aadfb8c2417ed6715711cb9e36e6c1e}`
+
+***
+
+### Analysis and Solution
+
+We are given a `tar.gz` file that contains a Linux filesystem. The first interesting directory upon opening is the `/app` directory containing a `Dockerfile` file.
+
+{% code title="Dockerfile" %}
+```docker
+FROM python:3-alpine
+
+ENV PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+RUN apk add --no-cache \
+    gcc \
+    musl-dev \
+    linux-headers \
+    libffi-dev \
+    openssl-dev \
+    curl
+
+RUN pip install --no-cache-dir Flask pycryptodome
+
+ARG ID1
+ARG ID2
+
+RUN curl "https://pastebin.com/raw/${ID1}"
+RUN curl -o app.py "https://pastebin.com/raw/${ID2}"
+
+EXPOSE 5000
+
+ENTRYPOINT ["python", "app.py"]
+```
+{% endcode %}
+
+From this file, we can infer that this Docker image will download two files from Pastebin based on the given `ID1` and `ID2` arguments. To locate the values used as `ID1` and `ID2`, we need to dig deeper into the filesystem to find files related to the Docker engine. Turns out that is stored on the `/var/lib/docker` directory. To ease the search of our `ID1` and `ID2` we can use `grep` to recursively search `ID1`and `ID2`.
+
+<figure><img src="../../.gitbook/assets/Screenshot 2025-01-12 072339.png" alt=""><figcaption><p>Result of grep using Neovim</p></figcaption></figure>
+
+From the screenshot above, we can find the value of `ID1`and `ID2` stored in one of the BuildKit blobs. After accessing the Pastebin links using the found IDs, we found that the first link will contain the first part of our flag.
+
+<figure><img src="../../.gitbook/assets/Screenshot 2025-01-12 072804.png" alt=""><figcaption><p>First Pastebin link containing the first part of the flag</p></figcaption></figure>
+
+The second file contains the main Python code that will run on the image.
+
+{% code title="" %}
+```python
+from flask import Flask, request, jsonify
+import base64
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import pad
+import os
+
+app = Flask(__name__)
+
+@app.route('/upload', methods=['POST'])
+def upload_file():
+  # Get query parameters
+  file_path = request.args.get('a')
+  encryption_key = request.args.get('b')
+
+  if not file_path:
+    return jsonify({"error": "Query parameter 'a' is required for file path."}), 400
+
+  try:
+    # Get the Base64-encoded file content from the request body
+    encoded_file = request.data.decode('utf-8')
+    file_content = base64.b64decode(encoded_file)
+
+    # If encryption key is provided, encrypt the file content
+    if encryption_key:
+      if len(encryption_key) not in (16, 24, 32):
+        return jsonify({"error": "Encryption key must be 16, 24, or 32 bytes long."}), 400
+      cipher = AES.new(encryption_key.encode('utf-8'), AES.MODE_ECB)
+      file_content = cipher.encrypt(pad(file_content, AES.block_size))
+
+    # Save the file
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    with open(file_path, 'wb') as f:
+      f.write(file_content)
+
+    return jsonify({"message": "File uploaded successfully."}), 200
+
+  except base64.binascii.Error:
+    return jsonify({"error": "Invalid Base64-encoded string."}), 400
+  except Exception as e:
+    return jsonify({"error": str(e)}), 500
+
+if __name__ == '__main__':
+  app.run(debug=True)
+```
+{% endcode %}
+
+The main functionality of this code is that if someone would access the `/upload` endpoint with a POST request, the uploaded file will be encrypted with AES ECB with the value of the query parameter `b` as the key and then saved to a location defined by the value of the query parameter `a`. If the `b` query parameter is not supplied, then the file will not be encrypted. From this information, we need to somehow recover the logs of this container and also recover the saved files of this container.
+
+After searching for a while, the logs are actually stored in `/var/lib/docker/containers/4e5f2fa4c43bba8c3123d068f2ec24e4399a860113d41cccbeb75c428cb04ebf/4e5f2fa4c43bba8c3123d068f2ec24e4399a860113d41cccbeb75c428cb04ebf-json.log`.
+
+<figure><img src="../../.gitbook/assets/Screenshot 2025-01-12 073952 (1).png" alt=""><figcaption><p>Docker container logs</p></figcaption></figure>
+
+From the logs above, we can see all of the files that is saved and their encryption keys, except for `/tmp/interesting` where that file is actually not encrypted. We can also see that most of the files will be stored in the `/tmp` directory. To retrieve the saved files, we need to locate the last state of the container.
+
+After another searching, we found that the files are saved in `/var/lib/docker/overlay2/473883c2dc201325561e7ad936c8aacc8aa3f6e6dac46911adc4479c0059fb77/diff`.
+
+<figure><img src="../../.gitbook/assets/Screenshot 2025-01-12 073857.png" alt=""><figcaption><p>Contents of the /tmp directory</p></figcaption></figure>
+
+Since we already know that the `interesting` file is not encrypted, we can open that file first and it turns out that it contains the second part of our flag.
+
+<figure><img src="../../.gitbook/assets/Screenshot 2025-01-12 074116.png" alt=""><figcaption><p>Second part of the flag</p></figcaption></figure>
+
+The last thing we need to do is to create a script to decrypt the files we found based on the logs that we already analyzed.
+
+{% code title="solve.py" overflow="wrap" %}
+```python
+import re
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import unpad
+
+logs = open('./4e5f2fa4c43bba8c3123d068f2ec24e4399a860113d41cccbeb75c428cb04ebf/4e5f2fa4c43bba8c3123d068f2ec24e4399a860113d41cccbeb75c428cb04ebf-json.log', 'r').read().encode().decode('unicode-escape')
+paths = set(re.findall(r'/upload\?a=(.+?)&b=(.+?) ', logs))
+
+for path, key in paths:
+    file = open(path[1:], 'rb').read()
+    cipher = AES.new(key.encode('utf-8'), AES.MODE_ECB)
+    file = unpad(cipher.decrypt(file), AES.block_size)
+    if 'Part 3' in file.decode('utf-8'):
+        print(file.decode('utf-8'))
+        break
+```
+{% endcode %}
+
+After running this script, we will get the last part of the flag to complete this challenge.
+
+<figure><img src="../../.gitbook/assets/Screenshot 2025-01-12 074438.png" alt=""><figcaption><p>Last part of the flag</p></figcaption></figure>

