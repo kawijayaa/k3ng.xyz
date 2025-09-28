@@ -22,12 +22,13 @@ export default async function Page(props: PageProps<'/writeups/[[...slug]]'>) {
 
   return (
     <DocsPage toc={page.data.toc} full={page.data.full} footer={footerOptions}>
-      <DocsTitle>{page.data.title}</DocsTitle>
+      <DocsTitle className="font-black text-4xl">
+        {page.data.title}
+      </DocsTitle>
       <DocsDescription>{page.data.description}</DocsDescription>
       <DocsBody>
         <MDXContent
           components={getMDXComponents({
-            // this allows you to link to other pages with relative file paths
             a: createRelativeLink(source, page),
           })}
         />

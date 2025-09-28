@@ -12,14 +12,12 @@ export function baseOptions(): BaseLayoutProps {
     nav: {
       title: (
         <>
-          <svg
-            width="24"
-            height="24"
-            xmlns="http://www.w3.org/2000/svg"
-            aria-label="Logo"
-          >
-            <circle cx={12} cy={12} r={12} fill="currentColor" />
-          </svg>
+          <img
+            width="28"
+            height="28"
+            className="rounded-full"
+            src="/profile.png"
+          />
           k3ng
         </>
       ),
@@ -27,8 +25,20 @@ export function baseOptions(): BaseLayoutProps {
     // see https://fumadocs.dev/docs/ui/navigation/links
     links: [
       {
+        text: 'About',
+        url: '/about'
+      },
+      {
         text: 'Writeups',
         url: '/writeups'
+      },
+      {
+        text: 'Blog',
+        url: '/blog'
+      },
+      {
+        text: 'Challenge Archive',
+        url: 'https://github.com/kawijayaa/ctf-challenges'
       }
     ],
   };

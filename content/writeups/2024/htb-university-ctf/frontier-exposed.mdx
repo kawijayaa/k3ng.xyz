@@ -1,0 +1,32 @@
+---
+title: Frontier Exposed
+icon: Fingerprint
+---
+
+### Challenge Description
+
+The chaos within the Frontier Cluster is relentless, with malicious actors exploiting vulnerabilities to establish footholds across the expanse. During routine surveillance, an open directory vulnerability was identified on a web server, suggesting suspicious activities tied to the Frontier Board. Your mission is to thoroughly investigate the server and determine a strategy to dismantle their infrastructure. Any credentials uncovered during the investigation would prove invaluable in achieving this objective. Spawn the docker and start the investigation!
+
+### Flag
+
+`HTB{C2_cr3d3nt14ls_3xp0s3d}`
+
+***
+
+### Analysis
+
+We are given a website that contains a directory listing for presumably a home directory.
+
+![](/frontier_exposed_1.png)
+
+Let's see the `.bash_history`file to see what commands has been executed.
+
+![](/frontier_exposed_2.png)
+
+### Solution
+
+There is a suspicious Base64 string when running the C2 client. Let's try to decode that.
+
+![](/frontier_exposed_3.png)
+
+And we got the flag!
