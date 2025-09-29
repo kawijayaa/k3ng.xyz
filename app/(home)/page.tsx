@@ -3,17 +3,17 @@ export default function HomePage() {
     <main className="flex flex-1 items-center justify-center gap-8 px-4 py-16 max-w-3xl mx-auto text-center">
       <img
         src="/profile.png"
-        className="w-48 h-48 rounded-full object-cover shadow-lg"
+        className="size-28 md:size-48 rounded-full object-cover shadow-lg"
       />
 
       <div className="flex flex-1 flex-col items-start gap-2">
-        <h1 className="text-5xl font-extrabold tracking-tight text-fd-foreground">
+        <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight text-fd-foreground">
           k3ng
         </h1>
         <p className="text-lg text-fd-muted-foreground max-w-xl">
           #1 forensics enjoyer
         </p>
-        <div className="flex justify-center gap-6 mt-4 text-fd-foreground">
+        <div className="flex justify-center gap-6 md:mt-4 text-fd-foreground">
           <a href="https://linkedin.com/in/muhammadoka" aria-label="LinkedIn">
             <svg
               className="size-6"

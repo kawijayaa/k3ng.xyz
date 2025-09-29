@@ -7,7 +7,7 @@ export default function Home() {
   );
 
   return (
-    <main className="grow container mx-auto max-w-5xl px-4 py-12">
+    <main className="grow container mx-auto max-w-5xl px-4 py-8">
       <h1 className="text-4xl font-extrabold mb-12">Blog Posts</h1>
       {posts.length === 0 ? (
         <p className="text-center text-fd-muted-foreground text-lg">
