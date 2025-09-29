@@ -22,7 +22,7 @@ export function WriteupTOC(params: { url: string }) {
       </thead>
       <tbody>
         {children.map((child) => (
-          <tr key={child.name}>
+          <tr key={child.url}>
             <td><a href={child.url}>{child.name}</a></td>
             <td>{iconsCategory[child.icon.type.render.displayName]}</td>
           </tr>
