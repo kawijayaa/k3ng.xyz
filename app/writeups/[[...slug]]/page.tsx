@@ -26,9 +26,9 @@ export default async function Page(props: PageProps<'/writeups/[[...slug]]'>) {
     enabled: false
   }
 
-  var icon: React.DetailedReactHTMLElement<React.HTMLAttributes<HTMLElement>, HTMLElement> | null;
+  var icon: any;
   if (pageItem) {
-    icon = pageItem.icon ? React.cloneElement(pageItem.icon, {
+    icon = pageItem.icon ? React.cloneElement(pageItem.icon as any, {
       width: undefined,
       height: undefined,
     }) : null
