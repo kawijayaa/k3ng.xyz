@@ -27,6 +27,7 @@ export default async function Page(props: PageProps<'/blog/[slug]'>) {
 
       <article className="container max-w-4xl flex flex-col md:flex-row gap-12 px-4 py-4">
         <section className="flex-1 prose max-w-none min-w-0">
+          <InlineTOC items={page.data.toc} />
           <Mdx components={defaultMdxComponents} />
         </section>
       </article>

