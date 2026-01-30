@@ -17,7 +17,7 @@ export default function About() {
     },
     {
       title: "Vice Person In Charge of CTF COMPFEST 16",
-      description: "Managed and organised one of the largest CTF competitions in Indonesia. Also curated and developed challenges for the competition.",
+      description: "Managed and organised one of the largest CTF competitions in Indonesia. Also curated and developed forensics challenges for the competition.",
       date: "2024",
     },
     {
@@ -27,6 +27,11 @@ export default function About() {
     },
   ];
   const achievements = [
+    {
+      title: "ACUCyS Jingle Shells CTF 2025 Winner",
+      description: "Won with the team \"UQ Cyber Squad: A Christmas Miracle\"",
+      date: "Dec 2025",
+    },
     {
       title: "The Australian Cyber Security Games 2025 2nd Place",
       description: "Achieved 2nd place with the team \"UQ \"The Squad\" CyberSquad\"",
