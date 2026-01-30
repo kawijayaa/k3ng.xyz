@@ -29,12 +29,12 @@ export default function About() {
   const achievements = [
     {
       title: "ACUCyS Jingle Shells CTF 2025 Winner",
-      description: "Won with the team \"UQ Cyber Squad: A Christmas Miracle\"",
+      description: "Won with the team \"UQ Cyber Squad: A Christmas Miracle\".",
       date: "Dec 2025",
     },
     {
       title: "The Australian Cyber Security Games 2025 2nd Place",
-      description: "Achieved 2nd place with the team \"UQ \"The Squad\" CyberSquad\"",
+      description: "Achieved 2nd place with the team \"UQ \"The Squad\" CyberSquad\".",
       date: "Jul 2025",
     },
     {
