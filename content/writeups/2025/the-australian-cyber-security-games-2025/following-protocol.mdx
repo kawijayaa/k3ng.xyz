@@ -555,7 +555,7 @@ Then we can just get the encrypted data using the `/api/img/<some_random_number>
 
 Great! We now know what to send to the Redis instance, but we still need to find out how to actually communicate to the Redis instance since we are using a different protocol from Redis.
 
-#### Following the Redis protocol (omg title of the challenge :astonished:)
+#### Following the Redis protocol (omg title of the challenge 😲)
 
 To achieve this, we can modify our HTTP request to change the verb to `EVAL` and then putting our payload on the URL itself to resemble a Redis command. The resulting HTTP request will look like this:
 
