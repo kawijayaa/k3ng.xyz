@@ -93,7 +93,7 @@ export default function About() {
         <p>
           Hello! I am k3ng, an Indonesian CTF player and cyber-security student
           currently playing for CSUI and UQ Cyber Squad. I have participated in
-          CTFs since 2022 and mainly does Web Exploitation and Forensics challenges.
+          CTFs since 2022 and mainly play the Forensics category.
           I also do create challenges from time to time.
         </p>
         <p>
