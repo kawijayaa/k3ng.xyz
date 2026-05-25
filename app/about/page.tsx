@@ -38,7 +38,7 @@ export default function About() {
   ];
   const achievements = [
     {
-      title: "HackTheBox University CTF 2025 4th place",
+      title: "HackTheBox University CTF 2025 4th Place",
       description:
         'Placed 4th place globally and 1st place in Indonesia with the team "CSUI".',
       date: "Dec 2025",
