@@ -1,4 +1,4 @@
-import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
+import type { BaseLayoutProps } from "fumadocs-ui/layouts/shared";
 
 /**
  * Shared layout configurations
@@ -25,21 +25,17 @@ export function baseOptions(): BaseLayoutProps {
     // see https://fumadocs.dev/docs/ui/navigation/links
     links: [
       {
-        text: 'About',
-        url: '/about'
+        text: "About",
+        url: "/about",
       },
       {
-        text: 'Writeups',
-        url: '/writeups'
+        text: "Writeups",
+        url: "/writeups",
       },
       {
-        text: 'Blog',
-        url: '/blog'
+        text: "Blog",
+        url: "/blog",
       },
-      {
-        text: 'Challenge Archive',
-        url: 'https://github.com/kawijayaa/ctf-challenges'
-      }
     ],
   };
 }
