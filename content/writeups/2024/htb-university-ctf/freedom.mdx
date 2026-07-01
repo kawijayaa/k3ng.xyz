@@ -19,15 +19,15 @@ Root flag: `HTB{l34ky_h4ndl3rs_4th3_w1n}`
 
 We start with `nmap` per usual, and we found an HTTP server, a DNS server and multiple services for Active Directory.
 
-![](/freedom_1.png)
+![](/images/freedom/freedom_1.png)
 
 After setting the hostname of this IP to `freedom.htb`, we can now access the website.
 
-![](/freedom_2.png)
+![](/images/freedom/freedom_2.png)
 
 From the HTML source code, we can see that this website is built using MuraCMS, evident from the JS and CSS files imported to the HTML.
 
-![](/freedom_3.png)
+![](/images/freedom/freedom_3.png)
 
 After some research, I have found an [SQL Injection vulnerability](https://github.com/Stuub/CVE-2024-32640-SQLI-MuraCMS?tab=readme-ov-file#details) on this website. With this injection, I managed to dump every table using the script below. Credits to NeoZap for creating this script.
 
@@ -176,15 +176,15 @@ One interesting table is `tusers`since all user information is stored there. We 
 
 After obtaining this information I realized since this is a CMS, there could be a reset password mechanism in place. Turns out, there is on the admin login on `http://freedom.htb/admin`.
 
-![](/freedom_4.png)
+![](/images/freedom/freedom_4.png)
 
 After entering the admin email and re-running the table dump script, I have found that the `tredirects`table will store the URL to edit the profile.
 
-![](/freedom_5.png)
+![](/images/freedom/freedom_5.png)
 
 When accessing the URL, we can now reset the admin's password to persist our access.
 
-![](/freedom_6.png)
+![](/images/freedom/freedom_6.png)
 
 CMS applications usually have some sort of plugin systems, and that is also the case for Mura/MasaCMS. Since plugins are executable, we can leverage this to get some sort of RCE. I have made (re: asked ChatGPT to make me one) a MasaCMS plugin to run shell commands.
 
@@ -236,22 +236,22 @@ And MasaCMS also needs a `config.xml.cfm`file on the `plugins/` directory. I bas
 
 After zipping the files together and adding a new plugin, we can access it on `http://freedom.htb/plugins/MyFirstPlugin/index.cfm?cmd=<your command>` .
 
-![](/freedom_7.png)
+![](/images/freedom/freedom_7.png)
 
 From here, we can make our access easier by using a reverse shell.
 
-![](/freedom_8.png)
+![](/images/freedom/freedom_8.png)
 
 ### Sandbox Escape
 
 We got stuck here for a while since I cannot find the root flag or user flag anywhere, until my teammate NeoZap found something inside the `/etc/resolv.conf`file.
 
-![](/freedom_9.png)
+![](/images/freedom/freedom_9.png)
 
 This means this Linux instance is actually hosted on a Windows machine. So it could mean that the flags are actually in the Windows part of the host machine. To access the host Windows filesystem, we can access it from the `/mnt/c` directory. And from there we can get the user flag on the `j.bret`'s Desktop directory.
 
-![](/freedom_10.png)
+![](/images/freedom/freedom_10.png)
 
 The root flag is going to be on the `Administrator`'s (duh) Desktop directory.
 
-![](/freedom_11.png)
+![](/images/freedom/freedom_11.png)

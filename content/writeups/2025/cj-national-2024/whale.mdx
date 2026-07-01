@@ -51,11 +51,11 @@ ENTRYPOINT ["python", "app.py"]
 
 From this file, we can infer that this Docker image will download two files from Pastebin based on the given `ID1` and `ID2` arguments. To locate the values used as `ID1` and `ID2`, we need to dig deeper into the filesystem to find files related to the Docker engine. Turns out that is stored on the `/var/lib/docker` directory. To ease the search of our `ID1` and `ID2` we can use `grep` to recursively search `ID1`and `ID2`.
 
-![](/whale_1.png)
+![](/images/whale/whale_1.png)
 
 From the screenshot above, we can find the value of `ID1`and `ID2` stored in one of the BuildKit blobs. After accessing the Pastebin links using the found IDs, we found that the first link will contain the first part of our flag.
 
-![](/whale_2.png)
+![](/images/whale/whale_2.png)
 
 The second file contains the main Python code that will run on the image.
 
@@ -109,17 +109,17 @@ The main functionality of this code is that if someone would access the `/upload
 
 After searching for a while, the logs are actually stored in `/var/lib/docker/containers/4e5f2fa4c43bba8c3123d068f2ec24e4399a860113d41cccbeb75c428cb04ebf/4e5f2fa4c43bba8c3123d068f2ec24e4399a860113d41cccbeb75c428cb04ebf-json.log`.
 
-![](/whale_3.png)
+![](/images/whale/whale_3.png)
 
 From the logs above, we can see all of the files that is saved and their encryption keys, except for `/tmp/interesting` where that file is actually not encrypted. We can also see that most of the files will be stored in the `/tmp` directory. To retrieve the saved files, we need to locate the last state of the container.
 
 After another searching, we found that the files are saved in `/var/lib/docker/overlay2/473883c2dc201325561e7ad936c8aacc8aa3f6e6dac46911adc4479c0059fb77/diff`.
 
-![](/whale_4.png)
+![](/images/whale/whale_4.png)
 
 Since we already know that the `interesting` file is not encrypted, we can open that file first and it turns out that it contains the second part of our flag.
 
-![](/whale_5.png)
+![](/images/whale/whale_5.png)
 
 The last thing we need to do is to create a script to decrypt the files we found based on the logs that we already analyzed.
 
@@ -142,4 +142,4 @@ for path, key in paths:
 
 After running this script, we will get the last part of the flag to complete this challenge.
 
-![](/whale_6.png)
+![](/images/whale/whale_6.png)

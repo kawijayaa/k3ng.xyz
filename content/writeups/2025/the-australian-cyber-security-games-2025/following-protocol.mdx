@@ -417,9 +417,9 @@ def vote_confirm():
 
 This service serves the front-end of the application, where the main functionality of the application is for users to cast a vote and generate a certificate to show that they have voted.
 
-![](/following_protocol_1.png)
+![](/images/following_protocol/following_protocol_1.png)
 
-![](/following_protocol_2.png)
+![](/images/following_protocol/following_protocol_2.png)
 
 This service also serves the `/api/*` endpoint to expose the internal services on this infrastructure. The service will create an Axios instance that will send a request to `http://backend.wbc`.
 
@@ -503,7 +503,7 @@ name=wbc
 
 Then we'll get the certifier used, which is `Ak4gHIGV`.
 
-![](/following_protocol_3.png)
+![](/images/following_protocol/following_protocol_3.png)
 
 Now for getting the base key, we can leverage the LFI we found on the Python backend to leak the key from the `.env` filed stored in `/app/.env`. We can do that using this request:
 
@@ -531,7 +531,7 @@ name=../../app/.env
 
 From that request we can get the base key of `0cccaf41450b4c0ca95f1a9c`.
 
-![](/following_protocol_4.png)
+![](/images/following_protocol/following_protocol_4.png)
 
 Now for the hard part, getting the encrypted data of `wbc`.
 
@@ -631,4 +631,4 @@ print(f"{flag=}")
 
 And with that we (finally) got the flag!
 
-![](/following_protocol_5.png)
+![](/images/following_protocol/following_protocol_5.png)

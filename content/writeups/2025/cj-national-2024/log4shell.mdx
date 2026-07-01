@@ -25,23 +25,23 @@ Flag 2: `CJ{w0w_u_are_4_certified_intrusion_analyst_exp3rt!1!}`&#x20;
 
 We are given a network capture that based on the description, is from a server that is suffering from a Log4Shell attack. When opened on Wireshark, we can see a packet that is sending a Log4Shell payload using HTTP.
 
-![](/log4shell_1.png)
+![](/images/log4shell/log4shell_1.png)
 
 Viewing the details, we can see the attacker used the same payloads on different headers. The payload itself will access the LDAP server on `157.230.252.80.md3wwucpwhoieybu17ym4ie0zr5itfp3e.oastify.com/3rq5mp6`.&#x20;
 
-![](/log4shell_2.png)
+![](/images/log4shell/log4shell_2.png)
 
 When we use the `ldap` filter on Wireshark, it will return nothing. But if we filter by the port used by LDAP, we will get some results which means the TCP packets are there but not recognized as an LDAP packet by Wireshark. We can configure Wireshark to always dissect packets on the `1389` port as an LDAP server by going to `Analyze > Decode As` and configuring the setting as shown below.
 
-![](/log4shell_3.png)
+![](/images/log4shell/log4shell_3.png)
 
 After configuring Wireshark as shown above, all LDAP packets will be parsed correctly.
 
-![](/log4shell_4.png)
+![](/images/log4shell/log4shell_4.png)
 
 We can see from the screenshot above that the first three characters of the flag (`CJ{`) is transmitted as the object name of the LDAP request. This is confirmed by looking at the HTTP requests, where some of them is trying to leak the `FLAGPARTX` environment variable where `X` is a number.&#x20;
 
-![](/log4shell_5.png)
+![](/images/log4shell/log4shell_5.png)
 
 ### Solution (Flag 1)
 
@@ -59,7 +59,7 @@ for packet in f:
 
 After running the script, we get the first flag. But this flag is not accepted by the platform.
 
-![](/log4shell_6.png)
+![](/images/log4shell/log4shell_6.png)
 
 The reason why is that when the HTTP request is exfiltrating the `FLAGPART33` environment variable, there is no LDAP request happening. This could mean that the value of the `FLAGPART33` environment variable is a reserved character for URLs. And since the 33rd character is between `2` and `}`, we can guess that the 33rd character of the flag is `?`. So the final flag is `CJ{c4n_y0u_c0ntinu3_unt1l_Flag_2?}`.
 
@@ -67,7 +67,7 @@ The reason why is that when the HTTP request is exfiltrating the `FLAGPART33` en
 
 To get the second flag, we need to investigate further. When filtering the HTTP packets, we can see that there is a request for a `Dropper.class` file.
 
-![](/log4shell_7.png)
+![](/images/log4shell/log4shell_7.png)
 
 After getting the response file and decompiling the Java class, we get the code below.
 
@@ -889,7 +889,7 @@ From the code, we can see the program will open a socket and when it receives so
 
 The value port parameter of the socket is the 27th element of `l`, which is `1337`. From this information, we can filter out packets using this port on Wireshark to see if any communications are happening on the socket.
 
-![](/log4shell_8.png)
+![](/images/log4shell/log4shell_8.png)
 
 ### Solution (Flag 2)
 
@@ -920,4 +920,4 @@ for comm in comms:
 
 After running the script, we can see the flag printed out.
 
-![](/log4shell_9.png)
+![](/images/log4shell/log4shell_9.png)

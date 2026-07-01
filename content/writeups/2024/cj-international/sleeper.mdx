@@ -19,11 +19,11 @@ Wareth is a person who always leaving her laptop without sleep, lock, or anythin
 
 We are given a network packet capture file and an `ad1` image file. From the packet capture, we can infer that data is transmitted using HTTP through the query parameter. The last part of the key contains the index and the value contains the data itself.
 
-![Query parameter from Wireshark](/sleeper_1.png)
+![Query parameter from Wireshark](/images/sleeper/sleeper_1.png)
 
 After analyzing the disk image, we found new files on the `C:\Windows\SysWOW64` directory. One is a screensaver file and another an executable.
 
-![Files on C:\Windows\SysWOW64](/sleeper_2.png)
+![Files on C:\Windows\SysWOW64](/images/sleeper/sleeper_2.png)
 
 The `chkmnt.exe` executable is just a normal screen capture application. But the `sconsvr.scr` file is interesting. Since `.scr` files are basically PE executables, we can reverse-engineer it using DNSpy.
 
@@ -129,7 +129,7 @@ We can see that the IV will be prefixed when the data is sent using HTTP, but ho
 
 The goal is that we need to decrypt the query parameter value from the HTTP packet using AES with the key and IV from the first 16 characters of the data, and assemble them based on the index on the query parameter key. After creating a script for that, we will get the flag from one of the screen captures.
 
-![Screenshot containing the flag](/sleeper_3.png)
+![Screenshot containing the flag](/images/sleeper/sleeper_3.png)
 
 ### Solver Script
 

@@ -1,7 +1,7 @@
 ---
 title: Analysing a Multi-Stage Malware From a Cloudflare Verification Phishing Campaign
 date: 2025-11-14
-thumbnail: /cloudflare_phishing_thumbnail.jpg
+thumbnail: /images/cloudflare_phishing/cloudflare_phishing_thumbnail.jpg
 ---
 
 Welcome to my first blog post, where I will (try) to dissect a malware sample used on a Cloudflare verification phishing campaign.
@@ -10,7 +10,7 @@ Welcome to my first blog post, where I will (try) to dissect a malware sample us
 
 I encountered a post on Reddit where a user is asking whether they are encountering a "virus" from an alleged "device verification" procedure from Cloudflare. This post intrigued me since I recently did a <a target="_blank" rel="noreferrer" href="https://github.com/DownUnderCTF/Challenges_2025_Public/tree/main/misc/fishy_website">challenge for DownUnderCTF 2025</a> using a similar method of phishing, using a fake verification dialog and guiding the user to run a command using the Run window.
 
-![](/cloudflare_phishing_1.jpg)
+![](/images/cloudflare_phishing/cloudflare_phishing_1.jpg)
 
 # Stage 1: Dropper
 
@@ -73,7 +73,7 @@ ExecuteMalware
 
 The executable from the previous script is a .NET executable that we can easily decompile using tools such as DNSpy. After decompilation, there are evident attempts to deobfuscate the code with random variable names and bogus functions.
 
-![](/cloudflare_phishing_2.png)
+![](/images/cloudflare_phishing/cloudflare_phishing_2.png)
 
 ## Constants
 
@@ -336,11 +336,11 @@ For some reason, this shellcode could not be analysed using shellcode-specific d
 
 The shellcode goes through stages of dynamically resolves certain system calls that is needed for the shellcode to run, which I honestly have no idea how it actually works. After skipping the dynamic resolution, we arrived at an address that calls a Windows API system call.
 
-![](/cloudflare_phishing_3.png)
+![](/images/cloudflare_phishing/cloudflare_phishing_3.png)
 
 This specific instruction will call a syscall stored in `edi`, which turns out to be `VirtualAlloc`. To see the arguments given to `VirtualAlloc`, we can see the stack values just before the `call` instruction.
 
-![](/cloudflare_phishing_4.png)
+![](/images/cloudflare_phishing/cloudflare_phishing_4.png)
 
 The first argument is set to 0, where the system will determine where to allocate the memory. Next up is the size of the memory region, which is set to `0x929C0`. The rest of the arguments are irrelevant to our analysis but the full details of parameters needed for `VirtualAlloc` can be found [here](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualalloc).
 
@@ -357,15 +357,15 @@ DECIMAL       HEXADECIMAL     DESCRIPTION
 
 The shellcode will write a PE executable to the memory region. We can check the hash of the executable on VirusTotal to see if there is any hits.
 
-![](/cloudflare_phishing_5.png)
+![](/images/cloudflare_phishing/cloudflare_phishing_5.png)
 
 The results are a bit all over the place with mentions of Strab, Zusy and Rhadamanthys but based on this [blog](https://research.checkpoint.com/2025/rhadamanthys-0-9-x-walk-through-the-updates/), a Lumma or Rhadamanthys executable will pop-up a dialog that will display a unique message. When running the sample inside an isolated VM, the unique message appears.
 
-![](/cloudflare_phishing_6.png)
+![](/images/cloudflare_phishing/cloudflare_phishing_6.png)
 
 The difference between Lumma and Rhadamanthys is that Lumma will use the `NtRaiseHardError` system call whereas Rhadamanthys will use the `MessageBoxW` system call. By analysing the API calls of the executable using API monitor, we can see the dialog box is displayed using the `MessageBoxW`, hence revealing the executable as being a Rhadamanthys infostealer.
 
-![](/cloudflare_phishing_7.png)
+![](/images/cloudflare_phishing/cloudflare_phishing_7.png)
 
 # Closing Statements
 

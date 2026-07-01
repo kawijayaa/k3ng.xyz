@@ -82,7 +82,7 @@ index="cj2025_mephisto" source="sysmon.json" Event.System.EventID="1" Event.Even
 | table Event.EventData.UtcTime
 ```
 
-![](/mephisto_q2_1.png)
+![](/images/mephisto/mephisto_q2_1.png)
 
 We can see the first result has the timestamp of `2025-12-21 16:15:10.406`. We just need to convert it to GMT+7 to get the answer we need.
 
@@ -105,7 +105,7 @@ index="cj2025_mephisto" source="sysmon.json" (Event.System.EventID="2" OR Event.
 
 We can see three filenames as a result: `ansi_art.exe`, `program.banner`, and `AnsiArt.lnk`. We just need to exclude the shortcut as per the question's request.
 
-![](/mephisto_q3_1.png)
+![](/images/mephisto/mephisto_q3_1.png)
 
 Answer: `ansi_art.exe,program.banner`
 
@@ -148,7 +148,7 @@ index="cj2025_mephisto" source="sysmon.json" Event.System.EventID="3" Event.Even
 | table Event.EventData.DestinationIp, Event.EventData.DestinationPort
 ```
 
-![](/mephisto_q6_1.png)
+![](/images/mephisto/mephisto_q6_1.png)
 
 We can see that we only got one unique answer of `192.168.100.157:443`.
 
@@ -171,7 +171,7 @@ index="cj2025_mephisto" source="sysmon.json" Event.EventData.CommandLine="*http*
 | table Event.EventData.CommandLine
 ```
 
-![](/mephisto_q7_1.png)
+![](/images/mephisto/mephisto_q7_1.png)
 
 Lot's of noise but we can see `certutil` trying to download an executable `PrintSpoofer64.exe` from `http://192.168.100.157:8082`.
 
@@ -192,7 +192,7 @@ index="cj2025_mephisto" source="sysmon.json" Event.EventData.CommandLine="*http:
 | table Event.EventData.CommandLine, Event.EventData.CurrentDirectory
 ```
 
-![](/mephisto_q8_1.png)
+![](/images/mephisto/mephisto_q8_1.png)
 
 We can see that all commands that is accessing the identified URL has the current directory set to `C:\h1dd3n\`.
 
@@ -233,7 +233,7 @@ index="cj2025_mephisto" source="sysmon.json" Event.EventData.CommandLine="*" ear
 | table _time, Event.EventData.CommandLine
 ```
 
-![](/mephisto_q10_1.png)
+![](/images/mephisto/mephisto_q10_1.png)
 
 We can see after downloading the `sadewa.zip`, the attacker is running `ipconfig`.
 
@@ -255,7 +255,7 @@ index="cj2025_mephisto" source="sysmon.json" Event.EventData.CommandLine="*net*u
 | table _time, Event.EventData.CommandLine
 ```
 
-![](/mephisto_q11_1.png)
+![](/images/mephisto/mephisto_q11_1.png)
 
 The latest user add command is using the credentials `as3ng_AsengCupu123!`.
 
@@ -277,7 +277,7 @@ index="cj2025_mephisto" source="sysmon.json" Event.EventData.CommandLine="*net*l
 | table _time, Event.EventData.CommandLine
 ```
 
-![](/mephisto_q12_1.png)
+![](/images/mephisto/mephisto_q12_1.png)
 
 We can see two groups added to the `as3ng` users: `administrators` and `Remote Desktop Users`.
 
@@ -299,7 +299,7 @@ index="cj2025_mephisto" source="terminalservices.json" Event.System.EventID="114
 | table _time, Event.UserData.EventXML.Param1, Event.UserData.EventXML.Param3
 ```
 
-![](/mephisto_q13_1.png)
+![](/images/mephisto/mephisto_q13_1.png)
 
 We can see the first timestamp is `2025-12-22 03:02:31.108`. We can convert it from GMT+10 to GMT+7 and use the given format to get the answer.
 
@@ -320,7 +320,7 @@ index="cj2025_mephisto" source="sysmon.json" Event.EventData.CurrentDirectory="C
 | table Event.EventData.CommandLine
 ```
 
-![](/mephisto_q14_1.png)
+![](/images/mephisto/mephisto_q14_1.png)
 
 We can see the first two rows shows a Mimikatz instance running with the executable name of `mimiperi.exe`
 
@@ -341,7 +341,7 @@ index="cj2025_mephisto" source="security.json" Event.System.EventID="4703" Event
 | table Event.EventData.ProcessName
 ```
 
-![](/mephisto_q15_1.png)
+![](/images/mephisto/mephisto_q15_1.png)
 
 We have two executables, but `sassy.exe` is our answer.
 
@@ -364,7 +364,7 @@ index="cj2025_mephisto" source="sysmon.json" Event.System.EventID="1"
 | table L.Event.EventData.CurrentDirectory, L.Event.EventData.ParentCommandLine, R.Event.EventData.PipeName
 ```
 
-![](/mephisto_q16_1.png)
+![](/images/mephisto/mephisto_q16_1.png)
 
 We will see that the top row is the event that we are looking for.
 
@@ -394,13 +394,13 @@ Let's recall back to our point zero where the compromises begins. Our focus now 
 
 When using Detect-It-Easy on the `AnsiArtInstaller.exe` file, we can see that this executable is a Nullsoft installer.
 
-![](/mephisto_q18_1.png)
+![](/images/mephisto/mephisto_q18_1.png)
 
 Nullsoft installers uses a `.nsi` script as the main script to dictate how will the installer installs the software to the system. To extract this script, we need a [special 7Zip version](https://github.com/myfreeer/7z-build-nsis) that allows the extraction of the NSIS script. But before extracting, we need to rename the installer to use the `.nsis` extension to allow 7Zip to recognise the file and extract it properly.
 
 After extraction we will get all of the packaged files, including the NSIS script.
 
-![](/mephisto_q18_2.png)
+![](/images/mephisto/mephisto_q18_2.png)
 
 The NSIS script contains a lot, but we will focus on the part where it loads the shellcode.
 
@@ -537,7 +537,7 @@ Here's the screenshotted overview of how we save it: https://drive.google.com/fi
 
 The given screenshot shows that the user is saving a file called `Dokumen Internal_Backupv2.docx`. To recover its thumbnail, we can go to `C:\Users\as3ng\AppData\Local\Microsoft\Windows\Explorer` and use Thumbcache Viewer to analyse the `thumbcache_*.db` files. We can find the thumbnail for this file at `thumbcache_768.db`
 
-![](/mephisto_q22_1.png)
+![](/images/mephisto/mephisto_q22_1.png)
 
 Answer: `Kode Rahasia Brankas PT Dananrata 11111131`
 
@@ -557,7 +557,7 @@ index="cj2025_mephisto" source="sysmon.json" gnarly.exe
 
 The first result gives us an event 13 that logs any value modifications of a registry key. Specifically, `gnarly.exe` is creating a new scheduled task, which can be used as a persistence mechanism.
 
-![](/mephisto_q23_1.png)
+![](/images/mephisto/mephisto_q23_1.png)
 
 Answer: `gnarly.exe`
 
@@ -571,7 +571,7 @@ What's the scheduled task that is being targeted by this executable? Please do p
 
 For this question, we need to go to `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Schedule\TaskCache\Tasks\{C94D9178-DEA0-46DF-9A2D-4776C39E6964}` to get the name of the task. We can use tools like `regshell` to open `C:\Windows\System32\config\SOFTWARE` and find the scheduled task.
 
-![](/mephisto_q24_1.png)
+![](/images/mephisto/mephisto_q24_1.png)
 
 We can see the value of `URI` is `\Microsoft\Windows\Windows Defender\Windows Defender Scheduled Scan`.
 
@@ -587,7 +587,7 @@ What's the full command of the overwritten scheduled task?
 
 We can get this from the `Actions` key from the previous registry query we did. The `Actions` key is Base64 encoded and can be decoded using tools like CyberChef.
 
-![](/mephisto_q25_1.png)
+![](/images/mephisto/mephisto_q25_1.png)
 
 After the `Author` string, we can see a `cmd.exe` string that indicates the command that will be used by the task.
 
