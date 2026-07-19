@@ -1,0 +1,237 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="CTF writeups, digital forensics, and cyber security notes by k3ng."><meta name="generator" content="Astro v7.1.1"><meta property="og:title" content="Armaxis | k3ng.xyz"><meta property="og:description" content="CTF writeups, digital forensics, and cyber security notes by k3ng."><meta property="og:type" content="website"><link rel="icon" type="image/jpeg" href="/favicon.jpg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"><title>Armaxis | k3ng.xyz</title><script>
+      const savedTheme = localStorage.getItem('theme');
+      const preferredTheme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.dataset.theme = savedTheme || preferredTheme;
+    </script><link rel="stylesheet" href="/_astro/BaseLayout.DZwBvaeU.css"></head><body><header class="site-header"><div class="header-inner"><a class="wordmark" href="/" aria-label="Home">k3ng</a><nav aria-label="Primary navigation"><a href="/blog">Blog</a><a href="/writeups" aria-current="page">Writeups</a><a href="/about">About</a></nav><button class="theme-toggle" type="button" aria-label="Toggle color theme"><span class="theme-light" aria-hidden="true">☼</span><span class="theme-dark" aria-hidden="true">☾</span></button></div></header><main class="article-shell has-toc"><article><header class="article-header"><p class="eyebrow">HTB University CTF 2024: Binary Badlands</p><h1>Armaxis</h1><ul class="article-tags" aria-label="Article tags"><li>password-reset-abuse</li><li>command-injection</li><li>markdown</li><li>node.js</li><li>mailhog</li></ul></header><div class="prose"><h3 id="challenge-description">Challenge Description</h3>
+<p>In the depths of the Frontier, Armaxis powers the enemy’s dominance, dispatching weapons to crush rebellion. Fortified and hidden, it controls vital supply chains. Yet, a flaw whispers of opportunity, a crack to expose its secrets and disrupt their plans. Can you breach Armaxis and turn its power against tyranny?</p>
+<h3 id="flag">Flag</h3>
+<p><code>HTB{l00k0ut_f0r_m4rkd0wn_LF1_1n_w1ld!_f7125778561f21b811f1aa33462db200}</code></p>
+<hr>
+<h3 id="analysis">Analysis</h3>
+<p>We are given two URLs, one is the website itself, and the other is a mail client logged in as <code>test@email.htb</code>. We are also given the source code for the challenge. After reading the source code, I found a vulnerability where the reset password token can be used for any user. When doing a password reset, the code only checks if the email exists, and it does not check if the token belongs to the email provided. This means we can use the email we have, and we could reset the admin’s password.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="javascript"><code><span class="line"><span style="color:#E6EDF3">router.</span><span style="color:#D2A8FF">post</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"/reset-password/request"</span><span style="color:#E6EDF3">, </span><span style="color:#FF7B72">async</span><span style="color:#E6EDF3"> (</span><span style="color:#FFA657">req</span><span style="color:#E6EDF3">, </span><span style="color:#FFA657">res</span><span style="color:#E6EDF3">) </span><span style="color:#FF7B72">=></span><span style="color:#E6EDF3"> {</span></span>
+<span class="line"><span style="color:#FF7B72">  const</span><span style="color:#E6EDF3"> { </span><span style="color:#79C0FF">email</span><span style="color:#E6EDF3"> } </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> req.body;</span></span>
+<span class="line"><span style="color:#FF7B72">  if</span><span style="color:#E6EDF3"> (</span><span style="color:#FF7B72">!</span><span style="color:#E6EDF3">email) </span><span style="color:#FF7B72">return</span><span style="color:#E6EDF3"> res.</span><span style="color:#D2A8FF">status</span><span style="color:#E6EDF3">(</span><span style="color:#79C0FF">400</span><span style="color:#E6EDF3">).</span><span style="color:#D2A8FF">send</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"Email is required."</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">  try</span><span style="color:#E6EDF3"> {</span></span>
+<span class="line"><span style="color:#FF7B72">    const</span><span style="color:#79C0FF"> user</span><span style="color:#FF7B72"> =</span><span style="color:#FF7B72"> await</span><span style="color:#D2A8FF"> getUserByEmail</span><span style="color:#E6EDF3">(email);</span></span>
+<span class="line"><span style="color:#FF7B72">    if</span><span style="color:#E6EDF3"> (</span><span style="color:#FF7B72">!</span><span style="color:#E6EDF3">user) </span><span style="color:#FF7B72">return</span><span style="color:#E6EDF3"> res.</span><span style="color:#D2A8FF">status</span><span style="color:#E6EDF3">(</span><span style="color:#79C0FF">404</span><span style="color:#E6EDF3">).</span><span style="color:#D2A8FF">send</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"User not found."</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">    const</span><span style="color:#79C0FF"> resetToken</span><span style="color:#FF7B72"> =</span><span style="color:#E6EDF3"> crypto.</span><span style="color:#D2A8FF">randomBytes</span><span style="color:#E6EDF3">(</span><span style="color:#79C0FF">16</span><span style="color:#E6EDF3">).</span><span style="color:#D2A8FF">toString</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"hex"</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#FF7B72">    const</span><span style="color:#79C0FF"> expiresAt</span><span style="color:#FF7B72"> =</span><span style="color:#E6EDF3"> Date.</span><span style="color:#D2A8FF">now</span><span style="color:#E6EDF3">() </span><span style="color:#FF7B72">+</span><span style="color:#79C0FF"> 3600000</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">    await</span><span style="color:#D2A8FF"> createPasswordReset</span><span style="color:#E6EDF3">(user.id, resetToken, expiresAt);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">    await</span><span style="color:#E6EDF3"> transporter.</span><span style="color:#D2A8FF">sendMail</span><span style="color:#E6EDF3">({</span></span>
+<span class="line"><span style="color:#E6EDF3">      from: </span><span style="color:#A5D6FF">"noreply@frontier.com"</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#E6EDF3">      to: email,</span></span>
+<span class="line"><span style="color:#E6EDF3">      subject: </span><span style="color:#A5D6FF">"Password Reset"</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#E6EDF3">      text: </span><span style="color:#A5D6FF">`Use this token to reset your password: ${</span><span style="color:#E6EDF3">resetToken</span><span style="color:#A5D6FF">}`</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#E6EDF3">    });</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">    res.</span><span style="color:#D2A8FF">send</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"Password reset token sent to your email."</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#E6EDF3">  } </span><span style="color:#FF7B72">catch</span><span style="color:#E6EDF3"> (err) {</span></span>
+<span class="line"><span style="color:#E6EDF3">    console.</span><span style="color:#D2A8FF">error</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"Error processing reset request:"</span><span style="color:#E6EDF3">, err);</span></span>
+<span class="line"><span style="color:#E6EDF3">    res.</span><span style="color:#D2A8FF">status</span><span style="color:#E6EDF3">(</span><span style="color:#79C0FF">500</span><span style="color:#E6EDF3">).</span><span style="color:#D2A8FF">send</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"Error processing reset request."</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#E6EDF3">  }</span></span>
+<span class="line"><span style="color:#E6EDF3">});</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">router.</span><span style="color:#D2A8FF">post</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"/reset-password"</span><span style="color:#E6EDF3">, </span><span style="color:#FF7B72">async</span><span style="color:#E6EDF3"> (</span><span style="color:#FFA657">req</span><span style="color:#E6EDF3">, </span><span style="color:#FFA657">res</span><span style="color:#E6EDF3">) </span><span style="color:#FF7B72">=></span><span style="color:#E6EDF3"> {</span></span>
+<span class="line"><span style="color:#FF7B72">  const</span><span style="color:#E6EDF3"> { </span><span style="color:#79C0FF">token</span><span style="color:#E6EDF3">, </span><span style="color:#79C0FF">newPassword</span><span style="color:#E6EDF3">, </span><span style="color:#79C0FF">email</span><span style="color:#E6EDF3"> } </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> req.body; </span><span style="color:#8B949E">// Added 'email' parameter</span></span>
+<span class="line"><span style="color:#FF7B72">  if</span><span style="color:#E6EDF3"> (</span><span style="color:#FF7B72">!</span><span style="color:#E6EDF3">token </span><span style="color:#FF7B72">||</span><span style="color:#FF7B72"> !</span><span style="color:#E6EDF3">newPassword </span><span style="color:#FF7B72">||</span><span style="color:#FF7B72"> !</span><span style="color:#E6EDF3">email)</span></span>
+<span class="line"><span style="color:#FF7B72">    return</span><span style="color:#E6EDF3"> res.</span><span style="color:#D2A8FF">status</span><span style="color:#E6EDF3">(</span><span style="color:#79C0FF">400</span><span style="color:#E6EDF3">).</span><span style="color:#D2A8FF">send</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"Token, email, and new password are required."</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">  try</span><span style="color:#E6EDF3"> {</span></span>
+<span class="line"><span style="color:#FF7B72">    const</span><span style="color:#79C0FF"> reset</span><span style="color:#FF7B72"> =</span><span style="color:#FF7B72"> await</span><span style="color:#D2A8FF"> getPasswordReset</span><span style="color:#E6EDF3">(token);</span></span>
+<span class="line"><span style="color:#FF7B72">    if</span><span style="color:#E6EDF3"> (</span><span style="color:#FF7B72">!</span><span style="color:#E6EDF3">reset) </span><span style="color:#FF7B72">return</span><span style="color:#E6EDF3"> res.</span><span style="color:#D2A8FF">status</span><span style="color:#E6EDF3">(</span><span style="color:#79C0FF">400</span><span style="color:#E6EDF3">).</span><span style="color:#D2A8FF">send</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"Invalid or expired token."</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">    const</span><span style="color:#79C0FF"> user</span><span style="color:#FF7B72"> =</span><span style="color:#FF7B72"> await</span><span style="color:#D2A8FF"> getUserByEmail</span><span style="color:#E6EDF3">(email);</span></span>
+<span class="line"><span style="color:#FF7B72">    if</span><span style="color:#E6EDF3"> (</span><span style="color:#FF7B72">!</span><span style="color:#E6EDF3">user) </span><span style="color:#FF7B72">return</span><span style="color:#E6EDF3"> res.</span><span style="color:#D2A8FF">status</span><span style="color:#E6EDF3">(</span><span style="color:#79C0FF">404</span><span style="color:#E6EDF3">).</span><span style="color:#D2A8FF">send</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"User not found."</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">    await</span><span style="color:#D2A8FF"> updateUserPassword</span><span style="color:#E6EDF3">(user.id, newPassword);</span></span>
+<span class="line"><span style="color:#FF7B72">    await</span><span style="color:#D2A8FF"> deletePasswordReset</span><span style="color:#E6EDF3">(token);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">    res.</span><span style="color:#D2A8FF">send</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"Password reset successful."</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#E6EDF3">  } </span><span style="color:#FF7B72">catch</span><span style="color:#E6EDF3"> (err) {</span></span>
+<span class="line"><span style="color:#E6EDF3">    console.</span><span style="color:#D2A8FF">error</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"Error resetting password:"</span><span style="color:#E6EDF3">, err);</span></span>
+<span class="line"><span style="color:#E6EDF3">    res.</span><span style="color:#D2A8FF">status</span><span style="color:#E6EDF3">(</span><span style="color:#79C0FF">500</span><span style="color:#E6EDF3">).</span><span style="color:#D2A8FF">send</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"Error resetting password."</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#E6EDF3">  }</span></span>
+<span class="line"><span style="color:#E6EDF3">});</span></span></code></pre>
+<p>The <code>/weapons/dispatch</code> endpoint is only accessible to the admin, further solidifying the approach I mentioned previously.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="javascript"><code><span class="line"><span style="color:#E6EDF3">router.</span><span style="color:#D2A8FF">get</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"/weapons/dispatch"</span><span style="color:#E6EDF3">, authenticate, (</span><span style="color:#FFA657">req</span><span style="color:#E6EDF3">, </span><span style="color:#FFA657">res</span><span style="color:#E6EDF3">) </span><span style="color:#FF7B72">=></span><span style="color:#E6EDF3"> {</span></span>
+<span class="line"><span style="color:#FF7B72">  const</span><span style="color:#E6EDF3"> { </span><span style="color:#79C0FF">role</span><span style="color:#E6EDF3"> } </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> req.user;</span></span>
+<span class="line"><span style="color:#FF7B72">  if</span><span style="color:#E6EDF3"> (role </span><span style="color:#FF7B72">!==</span><span style="color:#A5D6FF"> "admin"</span><span style="color:#E6EDF3">) </span><span style="color:#FF7B72">return</span><span style="color:#E6EDF3"> res.</span><span style="color:#D2A8FF">status</span><span style="color:#E6EDF3">(</span><span style="color:#79C0FF">403</span><span style="color:#E6EDF3">).</span><span style="color:#D2A8FF">send</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"Access denied."</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#E6EDF3">  res.</span><span style="color:#D2A8FF">render</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"dispatch-weapon.html"</span><span style="color:#E6EDF3">, {</span></span>
+<span class="line"><span style="color:#E6EDF3">    title: </span><span style="color:#A5D6FF">"Dispatch Weapon"</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#E6EDF3">    user: req.user,</span></span>
+<span class="line"><span style="color:#E6EDF3">  });</span></span>
+<span class="line"><span style="color:#E6EDF3">});</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">router.</span><span style="color:#D2A8FF">post</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"/weapons/dispatch"</span><span style="color:#E6EDF3">, authenticate, </span><span style="color:#FF7B72">async</span><span style="color:#E6EDF3"> (</span><span style="color:#FFA657">req</span><span style="color:#E6EDF3">, </span><span style="color:#FFA657">res</span><span style="color:#E6EDF3">) </span><span style="color:#FF7B72">=></span><span style="color:#E6EDF3"> {</span></span>
+<span class="line"><span style="color:#FF7B72">  const</span><span style="color:#E6EDF3"> { </span><span style="color:#79C0FF">role</span><span style="color:#E6EDF3"> } </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> req.user;</span></span>
+<span class="line"><span style="color:#FF7B72">  if</span><span style="color:#E6EDF3"> (role </span><span style="color:#FF7B72">!==</span><span style="color:#A5D6FF"> "admin"</span><span style="color:#E6EDF3">) </span><span style="color:#FF7B72">return</span><span style="color:#E6EDF3"> res.</span><span style="color:#D2A8FF">status</span><span style="color:#E6EDF3">(</span><span style="color:#79C0FF">403</span><span style="color:#E6EDF3">).</span><span style="color:#D2A8FF">send</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"Access denied."</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">  const</span><span style="color:#E6EDF3"> { </span><span style="color:#79C0FF">name</span><span style="color:#E6EDF3">, </span><span style="color:#79C0FF">price</span><span style="color:#E6EDF3">, </span><span style="color:#79C0FF">note</span><span style="color:#E6EDF3">, </span><span style="color:#79C0FF">dispatched_to</span><span style="color:#E6EDF3"> } </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> req.body;</span></span>
+<span class="line"><span style="color:#FF7B72">  if</span><span style="color:#E6EDF3"> (</span><span style="color:#FF7B72">!</span><span style="color:#E6EDF3">name </span><span style="color:#FF7B72">||</span><span style="color:#FF7B72"> !</span><span style="color:#E6EDF3">price </span><span style="color:#FF7B72">||</span><span style="color:#FF7B72"> !</span><span style="color:#E6EDF3">note </span><span style="color:#FF7B72">||</span><span style="color:#FF7B72"> !</span><span style="color:#E6EDF3">dispatched_to) {</span></span>
+<span class="line"><span style="color:#FF7B72">    return</span><span style="color:#E6EDF3"> res.</span><span style="color:#D2A8FF">status</span><span style="color:#E6EDF3">(</span><span style="color:#79C0FF">400</span><span style="color:#E6EDF3">).</span><span style="color:#D2A8FF">send</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"All fields are required."</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#E6EDF3">  }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">  try</span><span style="color:#E6EDF3"> {</span></span>
+<span class="line"><span style="color:#FF7B72">    const</span><span style="color:#79C0FF"> parsedNote</span><span style="color:#FF7B72"> =</span><span style="color:#D2A8FF"> parseMarkdown</span><span style="color:#E6EDF3">(note);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">    await</span><span style="color:#D2A8FF"> dispatchWeapon</span><span style="color:#E6EDF3">(name, price, parsedNote, dispatched_to);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">    res.</span><span style="color:#D2A8FF">send</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"Weapon dispatched successfully."</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#E6EDF3">  } </span><span style="color:#FF7B72">catch</span><span style="color:#E6EDF3"> (err) {</span></span>
+<span class="line"><span style="color:#E6EDF3">    console.</span><span style="color:#D2A8FF">error</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"Error dispatching weapon:"</span><span style="color:#E6EDF3">, err);</span></span>
+<span class="line"><span style="color:#E6EDF3">    res.</span><span style="color:#D2A8FF">status</span><span style="color:#E6EDF3">(</span><span style="color:#79C0FF">500</span><span style="color:#E6EDF3">).</span><span style="color:#D2A8FF">send</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"Error dispatching weapon."</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#E6EDF3">  }</span></span>
+<span class="line"><span style="color:#E6EDF3">});</span></span></code></pre>
+<p>The POST handler also calls the <code>parseMarkdown</code>function, where any images on the markdown will be accessed using the <code>curl</code>command. But the command execution is not sanitized, therefore vulnerable to command injection. Then the result of the command execution will be stored as Base64 and rendered on an <code>img</code>tag.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="javascript"><code><span class="line"><span style="color:#FF7B72">const</span><span style="color:#79C0FF"> MarkdownIt</span><span style="color:#FF7B72"> =</span><span style="color:#D2A8FF"> require</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">'markdown-it'</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#FF7B72">const</span><span style="color:#E6EDF3"> { </span><span style="color:#79C0FF">execSync</span><span style="color:#E6EDF3"> } </span><span style="color:#FF7B72">=</span><span style="color:#D2A8FF"> require</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">'child_process'</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">const</span><span style="color:#79C0FF"> md</span><span style="color:#FF7B72"> =</span><span style="color:#FF7B72"> new</span><span style="color:#D2A8FF"> MarkdownIt</span><span style="color:#E6EDF3">({</span></span>
+<span class="line"><span style="color:#E6EDF3">    html: </span><span style="color:#79C0FF">true</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#E6EDF3">});</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">function</span><span style="color:#D2A8FF"> parseMarkdown</span><span style="color:#E6EDF3">(</span><span style="color:#FFA657">content</span><span style="color:#E6EDF3">) {</span></span>
+<span class="line"><span style="color:#FF7B72">    if</span><span style="color:#E6EDF3"> (</span><span style="color:#FF7B72">!</span><span style="color:#E6EDF3">content) </span><span style="color:#FF7B72">return</span><span style="color:#A5D6FF"> ''</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#FF7B72">    return</span><span style="color:#E6EDF3"> md.</span><span style="color:#D2A8FF">render</span><span style="color:#E6EDF3">(</span></span>
+<span class="line"><span style="color:#E6EDF3">        content.</span><span style="color:#D2A8FF">replace</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">/</span><span style="color:#7EE787;font-weight:bold">\!\[</span><span style="color:#79C0FF">.</span><span style="color:#FF7B72">*?</span><span style="color:#7EE787;font-weight:bold">\]\(</span><span style="color:#A5D6FF">(</span><span style="color:#79C0FF">.</span><span style="color:#FF7B72">*?</span><span style="color:#A5D6FF">)</span><span style="color:#7EE787;font-weight:bold">\)</span><span style="color:#A5D6FF">/</span><span style="color:#FF7B72">g</span><span style="color:#E6EDF3">, (</span><span style="color:#FFA657">match</span><span style="color:#E6EDF3">, </span><span style="color:#FFA657">url</span><span style="color:#E6EDF3">) </span><span style="color:#FF7B72">=></span><span style="color:#E6EDF3"> {</span></span>
+<span class="line"><span style="color:#FF7B72">            try</span><span style="color:#E6EDF3"> {</span></span>
+<span class="line"><span style="color:#FF7B72">                const</span><span style="color:#79C0FF"> fileContent</span><span style="color:#FF7B72"> =</span><span style="color:#D2A8FF"> execSync</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">`curl -s ${</span><span style="color:#E6EDF3">url</span><span style="color:#A5D6FF">}`</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#FF7B72">                const</span><span style="color:#79C0FF"> base64Content</span><span style="color:#FF7B72"> =</span><span style="color:#E6EDF3"> Buffer.</span><span style="color:#D2A8FF">from</span><span style="color:#E6EDF3">(fileContent).</span><span style="color:#D2A8FF">toString</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">'base64'</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#FF7B72">                return</span><span style="color:#A5D6FF"> `&#x3C;img src="data:image/*;base64,${</span><span style="color:#E6EDF3">base64Content</span><span style="color:#A5D6FF">}" alt="Embedded Image">`</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#E6EDF3">            } </span><span style="color:#FF7B72">catch</span><span style="color:#E6EDF3"> (err) {</span></span>
+<span class="line"><span style="color:#E6EDF3">                console.</span><span style="color:#D2A8FF">error</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">`Error fetching image from URL ${</span><span style="color:#E6EDF3">url</span><span style="color:#A5D6FF">}:`</span><span style="color:#E6EDF3">, err.message);</span></span>
+<span class="line"><span style="color:#FF7B72">                return</span><span style="color:#A5D6FF"> `&#x3C;p>Error loading image: ${</span><span style="color:#E6EDF3">url</span><span style="color:#A5D6FF">}&#x3C;/p>`</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#E6EDF3">            }</span></span>
+<span class="line"><span style="color:#E6EDF3">        })</span></span>
+<span class="line"><span style="color:#E6EDF3">    );</span></span>
+<span class="line"><span style="color:#E6EDF3">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79C0FF">module</span><span style="color:#E6EDF3">.</span><span style="color:#79C0FF">exports</span><span style="color:#FF7B72"> =</span><span style="color:#E6EDF3"> { parseMarkdown };</span></span></code></pre>
+<p>On the <code>database.js</code>file, we can see that it inserts a default admin user with a random password. We can use <code>admin@armaxis.htb</code> when resetting the admin’s password.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="javascript"><code><span class="line"><span style="color:#FF7B72">async</span><span style="color:#FF7B72"> function</span><span style="color:#D2A8FF"> initializeDatabase</span><span style="color:#E6EDF3">() {</span></span>
+<span class="line"><span style="color:#FF7B72">  try</span><span style="color:#E6EDF3"> {</span></span>
+<span class="line"><span style="color:#FF7B72">    await</span><span style="color:#D2A8FF"> run</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">`CREATE TABLE IF NOT EXISTS users (</span></span>
+<span class="line"><span style="color:#A5D6FF">            id INTEGER PRIMARY KEY AUTOINCREMENT,</span></span>
+<span class="line"><span style="color:#A5D6FF">            email VARCHAR(255) UNIQUE,</span></span>
+<span class="line"><span style="color:#A5D6FF">            password VARCHAR(255),</span></span>
+<span class="line"><span style="color:#A5D6FF">            role VARCHAR(50)</span></span>
+<span class="line"><span style="color:#A5D6FF">        )`</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">    await</span><span style="color:#D2A8FF"> run</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">`CREATE TABLE IF NOT EXISTS weapons (</span></span>
+<span class="line"><span style="color:#A5D6FF">            id INTEGER PRIMARY KEY AUTOINCREMENT,</span></span>
+<span class="line"><span style="color:#A5D6FF">            name VARCHAR(255),</span></span>
+<span class="line"><span style="color:#A5D6FF">            price REAL,</span></span>
+<span class="line"><span style="color:#A5D6FF">            note TEXT,</span></span>
+<span class="line"><span style="color:#A5D6FF">            dispatched_to VARCHAR(255),</span></span>
+<span class="line"><span style="color:#A5D6FF">            FOREIGN KEY (dispatched_to) REFERENCES users (email)</span></span>
+<span class="line"><span style="color:#A5D6FF">        )`</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">    await</span><span style="color:#D2A8FF"> run</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">`CREATE TABLE IF NOT EXISTS password_resets (</span></span>
+<span class="line"><span style="color:#A5D6FF">            id INTEGER PRIMARY KEY AUTOINCREMENT,</span></span>
+<span class="line"><span style="color:#A5D6FF">            user_id INTEGER NOT NULL,</span></span>
+<span class="line"><span style="color:#A5D6FF">            token VARCHAR(64) NOT NULL,</span></span>
+<span class="line"><span style="color:#A5D6FF">            expires_at INTEGER NOT NULL,</span></span>
+<span class="line"><span style="color:#A5D6FF">            FOREIGN KEY (user_id) REFERENCES users (id)</span></span>
+<span class="line"><span style="color:#A5D6FF">        )`</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">    const</span><span style="color:#79C0FF"> userCount</span><span style="color:#FF7B72"> =</span><span style="color:#FF7B72"> await</span><span style="color:#D2A8FF"> get</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">`SELECT COUNT(*) as count FROM users`</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#FF7B72">    if</span><span style="color:#E6EDF3"> (userCount.count </span><span style="color:#FF7B72">===</span><span style="color:#79C0FF"> 0</span><span style="color:#E6EDF3">) {</span></span>
+<span class="line"><span style="color:#FF7B72">      const</span><span style="color:#79C0FF"> insertUser</span><span style="color:#FF7B72"> =</span><span style="color:#E6EDF3"> db.</span><span style="color:#D2A8FF">prepare</span><span style="color:#E6EDF3">(</span></span>
+<span class="line"><span style="color:#A5D6FF">        `INSERT INTO users (email, password, role) VALUES (?, ?, ?)`</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#E6EDF3">      );</span></span>
+<span class="line"><span style="color:#FF7B72">      const</span><span style="color:#79C0FF"> runInsertUser</span><span style="color:#FF7B72"> =</span><span style="color:#D2A8FF"> promisify</span><span style="color:#E6EDF3">(insertUser.run.</span><span style="color:#D2A8FF">bind</span><span style="color:#E6EDF3">(insertUser));</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">      await</span><span style="color:#D2A8FF"> runInsertUser</span><span style="color:#E6EDF3">(</span></span>
+<span class="line"><span style="color:#A5D6FF">        "admin@armaxis.htb"</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#A5D6FF">        `${</span><span style="color:#E6EDF3">crypto</span><span style="color:#A5D6FF">.</span><span style="color:#D2A8FF">randomBytes</span><span style="color:#A5D6FF">(</span><span style="color:#79C0FF">69</span><span style="color:#A5D6FF">).</span><span style="color:#D2A8FF">toString</span><span style="color:#A5D6FF">(</span><span style="color:#A5D6FF">"hex"</span><span style="color:#A5D6FF">)</span><span style="color:#A5D6FF">}`</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#A5D6FF">        "admin"</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#E6EDF3">      );</span></span>
+<span class="line"><span style="color:#E6EDF3">      insertUser.</span><span style="color:#D2A8FF">finalize</span><span style="color:#E6EDF3">();</span></span>
+<span class="line"><span style="color:#E6EDF3">      console.</span><span style="color:#D2A8FF">log</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"Seeded initial users."</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#E6EDF3">    }</span></span>
+<span class="line"><span style="color:#E6EDF3">  } </span><span style="color:#FF7B72">catch</span><span style="color:#E6EDF3"> (error) {</span></span>
+<span class="line"><span style="color:#E6EDF3">    console.</span><span style="color:#D2A8FF">error</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"Error initializing database:"</span><span style="color:#E6EDF3">, error);</span></span>
+<span class="line"><span style="color:#E6EDF3">  }</span></span>
+<span class="line"><span style="color:#E6EDF3">}</span></span></code></pre>
+<p>From the <code>Dockerfile</code>, we can also see that the flag will be stored at <code>/flag.txt</code>.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="docker"><code><span class="line"><span style="color:#8B949E"># Use Node.js base image with Alpine Linux</span></span>
+<span class="line"><span style="color:#FF7B72">FROM</span><span style="color:#E6EDF3"> node:alpine</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#8B949E"># Install required dependencies for MailHog and supervisord</span></span>
+<span class="line"><span style="color:#FF7B72">RUN</span><span style="color:#E6EDF3"> apk add --no-cache \</span></span>
+<span class="line"><span style="color:#E6EDF3">    wget \</span></span>
+<span class="line"><span style="color:#E6EDF3">    supervisor \</span></span>
+<span class="line"><span style="color:#E6EDF3">    apache2-utils \</span></span>
+<span class="line"><span style="color:#E6EDF3">    curl</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#8B949E"># Install MailHog binary</span></span>
+<span class="line"><span style="color:#FF7B72">WORKDIR</span><span style="color:#E6EDF3"> /</span></span>
+<span class="line"><span style="color:#FF7B72">RUN</span><span style="color:#E6EDF3"> wget https://github.com/mailhog/MailHog/releases/download/v1.0.1/MailHog_linux_amd64</span></span>
+<span class="line"><span style="color:#FF7B72">RUN</span><span style="color:#E6EDF3"> chmod +x MailHog_linux_amd64</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#8B949E"># Prepare email directory and copy app files</span></span>
+<span class="line"><span style="color:#FF7B72">RUN</span><span style="color:#E6EDF3"> mkdir -p /email</span></span>
+<span class="line"><span style="color:#FF7B72">COPY</span><span style="color:#E6EDF3"> email-app /email</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">WORKDIR</span><span style="color:#E6EDF3"> /email</span></span>
+<span class="line"><span style="color:#FF7B72">RUN</span><span style="color:#E6EDF3"> npm install</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#8B949E"># Generate a random password and create authentication file for MailHog</span></span>
+<span class="line"><span style="color:#FF7B72">RUN</span><span style="color:#E6EDF3"> RANDOM_VALUE=$(cat /dev/urandom | tr -dc </span><span style="color:#A5D6FF">'a-zA-Z0-9'</span><span style="color:#E6EDF3"> | fold -w 32 | head -n 1) \</span></span>
+<span class="line"><span style="color:#E6EDF3">    &#x26;&#x26; htpasswd -nbBC 10 test </span><span style="color:#A5D6FF">"$RANDOM_VALUE"</span><span style="color:#E6EDF3"> > /mailhog-auth \</span></span>
+<span class="line"><span style="color:#E6EDF3">    &#x26;&#x26; echo $RANDOM_VALUE > /email/password.txt</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#8B949E"># Set working directory for the main app</span></span>
+<span class="line"><span style="color:#FF7B72">WORKDIR</span><span style="color:#E6EDF3"> /app</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#8B949E"># Copy challenge files and install dependencies</span></span>
+<span class="line"><span style="color:#FF7B72">COPY</span><span style="color:#E6EDF3"> challenge .</span></span>
+<span class="line"><span style="color:#FF7B72">RUN</span><span style="color:#E6EDF3"> npm install</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#8B949E"># Copy supervisord configuration</span></span>
+<span class="line"><span style="color:#FF7B72">COPY</span><span style="color:#E6EDF3"> config/supervisord.conf /etc/supervisor/conf.d/supervisord.conf</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#8B949E"># Expose ports for the app and email client</span></span>
+<span class="line"><span style="color:#FF7B72">EXPOSE</span><span style="color:#E6EDF3"> 8080</span></span>
+<span class="line"><span style="color:#FF7B72">EXPOSE</span><span style="color:#E6EDF3"> 1337</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">COPY</span><span style="color:#E6EDF3"> flag.txt /flag.txt</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#8B949E"># Start supervisord</span></span>
+<span class="line"><span style="color:#FF7B72">CMD</span><span style="color:#E6EDF3"> [</span><span style="color:#A5D6FF">"supervisord"</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"-c"</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"/etc/supervisor/conf.d/supervisord.conf"</span><span style="color:#E6EDF3">]</span></span></code></pre>
+<h3 id="solution">Solution</h3>
+<p>First off, we need to register a new account using the email we have on the mail client. </p>
+<p><img src="/images/armaxis/armaxis_1.png" alt=""></p>
+<p>After registering, we need go through the reset password mechanism, entering <code>test@email.htb</code>as our email.</p>
+<p><img src="/images/armaxis/armaxis_2.png" alt=""></p>
+<p>After requesting a code, we will receive the code on our mail client.</p>
+<p><img src="/images/armaxis/armaxis_3.png" alt=""></p>
+<p>Now, we need to start over the reset password mechanism but now entering <code>admin@armaxis.htb</code>as the email and using the token from when we are trying to reset <code>test@email.htb</code>.</p>
+<p><img src="/images/armaxis/armaxis_4.png" alt=""></p>
+<p>After logging in, we can dispatch a new weapon and injecting a command using markdown images on the note.</p>
+<p><img src="/images/armaxis/armaxis_5.png" alt=""></p>
+<p>Then, the flag will be stored as a Base64 on the image source.</p>
+<p><img src="/images/armaxis/armaxis_6.png" alt=""></p>
+<p><img src="/images/armaxis/armaxis_7.png" alt=""></p></div></article><aside class="toc" aria-label="On this page"><p>On this page</p><ol><li class="nested"><a href="#challenge-description">Challenge Description</a></li><li class="nested"><a href="#flag">Flag</a></li><li class="nested"><a href="#analysis">Analysis</a></li><li class="nested"><a href="#solution">Solution</a></li></ol></aside></main><footer class="site-footer"><div><span>k3ng.xyz</span><span class="footer-note">2026</span></div></footer><script>
+      document.querySelector('.theme-toggle')?.addEventListener('click', () => {
+        const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+        const updateTheme = () => {
+          document.documentElement.dataset.theme = theme;
+          localStorage.setItem('theme', theme);
+        };
+
+        if (document.startViewTransition) {
+          document.startViewTransition(updateTheme);
+          return;
+        }
+
+        document.documentElement.classList.add('theme-transition');
+        updateTheme();
+        setTimeout(() => document.documentElement.classList.remove('theme-transition'), 650);
+      });
+    </script></body></html>

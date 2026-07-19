@@ -1,0 +1,128 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="CTF writeups, digital forensics, and cyber security notes by k3ng."><meta name="generator" content="Astro v7.1.1"><meta property="og:title" content="Whale | k3ng.xyz"><meta property="og:description" content="CTF writeups, digital forensics, and cyber security notes by k3ng."><meta property="og:type" content="website"><link rel="icon" type="image/jpeg" href="/favicon.jpg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"><title>Whale | k3ng.xyz</title><script>
+      const savedTheme = localStorage.getItem('theme');
+      const preferredTheme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.dataset.theme = savedTheme || preferredTheme;
+    </script><link rel="stylesheet" href="/_astro/BaseLayout.DZwBvaeU.css"></head><body><header class="site-header"><div class="header-inner"><a class="wordmark" href="/" aria-label="Home">k3ng</a><nav aria-label="Primary navigation"><a href="/blog">Blog</a><a href="/writeups" aria-current="page">Writeups</a><a href="/about">About</a></nav><button class="theme-toggle" type="button" aria-label="Toggle color theme"><span class="theme-light" aria-hidden="true">☼</span><span class="theme-dark" aria-hidden="true">☾</span></button></div></header><main class="article-shell has-toc"><article><header class="article-header"><p class="eyebrow">Cyber Jawara National 2024</p><h1>Whale</h1><ul class="article-tags" aria-label="Article tags"><li>docker-forensics</li><li>buildkit</li><li>overlayfs</li><li>container-logs</li><li>aes-ecb</li></ul></header><div class="prose"><h3 id="challenge-description">Challenge Description</h3>
+<p>Someone broke into our application server. Could you help to investigate what they did?</p>
+<p><a href="https://drive.google.com/file/d/1du2MDOLldM3d_akDkIxypSStuaOSuDP6/view?usp=sharing">https://drive.google.com/file/d/1du2MDOLldM3d_akDkIxypSStuaOSuDP6/view?usp=sharing</a></p>
+<p>Author: farisv</p>
+<h3 id="flag">Flag</h3>
+<p><code>CJ{dae071f96aadfb8c2417ed6715711cb9e36e6c1e}</code></p>
+<hr>
+<h3 id="analysis-and-solution">Analysis and Solution</h3>
+<p>We are given a <code>tar.gz</code> file that contains a Linux filesystem. The first interesting directory upon opening is the <code>/app</code> directory containing a <code>Dockerfile</code> file.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="docker"><code><span class="line"><span style="color:#FF7B72">FROM</span><span style="color:#E6EDF3"> python:3-alpine</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">ENV</span><span style="color:#E6EDF3"> PYTHONUNBUFFERED=1</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">WORKDIR</span><span style="color:#E6EDF3"> /app</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">RUN</span><span style="color:#E6EDF3"> apk add --no-cache \</span></span>
+<span class="line"><span style="color:#E6EDF3">    gcc \</span></span>
+<span class="line"><span style="color:#E6EDF3">    musl-dev \</span></span>
+<span class="line"><span style="color:#E6EDF3">    linux-headers \</span></span>
+<span class="line"><span style="color:#E6EDF3">    libffi-dev \</span></span>
+<span class="line"><span style="color:#E6EDF3">    openssl-dev \</span></span>
+<span class="line"><span style="color:#E6EDF3">    curl</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">RUN</span><span style="color:#E6EDF3"> pip install --no-cache-dir Flask pycryptodome</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">ARG</span><span style="color:#E6EDF3"> ID1</span></span>
+<span class="line"><span style="color:#FF7B72">ARG</span><span style="color:#E6EDF3"> ID2</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">RUN</span><span style="color:#E6EDF3"> curl </span><span style="color:#A5D6FF">"https://pastebin.com/raw/${ID1}"</span></span>
+<span class="line"><span style="color:#FF7B72">RUN</span><span style="color:#E6EDF3"> curl -o app.py </span><span style="color:#A5D6FF">"https://pastebin.com/raw/${ID2}"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">EXPOSE</span><span style="color:#E6EDF3"> 5000</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">ENTRYPOINT</span><span style="color:#E6EDF3"> [</span><span style="color:#A5D6FF">"python"</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"app.py"</span><span style="color:#E6EDF3">]</span></span></code></pre>
+<p>From this file, we can infer that this Docker image will download two files from Pastebin based on the given <code>ID1</code> and <code>ID2</code> arguments. To locate the values used as <code>ID1</code> and <code>ID2</code>, we need to dig deeper into the filesystem to find files related to the Docker engine. Turns out that is stored on the <code>/var/lib/docker</code> directory. To ease the search of our <code>ID1</code> and <code>ID2</code> we can use <code>grep</code> to recursively search <code>ID1</code>and <code>ID2</code>.</p>
+<p><img src="/images/whale/whale_1.png" alt=""></p>
+<p>From the screenshot above, we can find the value of <code>ID1</code>and <code>ID2</code> stored in one of the BuildKit blobs. After accessing the Pastebin links using the found IDs, we found that the first link will contain the first part of our flag.</p>
+<p><img src="/images/whale/whale_2.png" alt=""></p>
+<p>The second file contains the main Python code that will run on the image.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#FF7B72">from</span><span style="color:#E6EDF3"> flask </span><span style="color:#FF7B72">import</span><span style="color:#E6EDF3"> Flask, request, jsonify</span></span>
+<span class="line"><span style="color:#FF7B72">import</span><span style="color:#E6EDF3"> base64</span></span>
+<span class="line"><span style="color:#FF7B72">from</span><span style="color:#E6EDF3"> Crypto.Cipher </span><span style="color:#FF7B72">import</span><span style="color:#79C0FF"> AES</span></span>
+<span class="line"><span style="color:#FF7B72">from</span><span style="color:#E6EDF3"> Crypto.Util.Padding </span><span style="color:#FF7B72">import</span><span style="color:#E6EDF3"> pad</span></span>
+<span class="line"><span style="color:#FF7B72">import</span><span style="color:#E6EDF3"> os</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">app </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> Flask(</span><span style="color:#79C0FF">__name__</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#D2A8FF">@app.route</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">'/upload'</span><span style="color:#E6EDF3">, </span><span style="color:#FFA657">methods</span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3">[</span><span style="color:#A5D6FF">'POST'</span><span style="color:#E6EDF3">])</span></span>
+<span class="line"><span style="color:#FF7B72">def</span><span style="color:#D2A8FF"> upload_file</span><span style="color:#E6EDF3">():</span></span>
+<span class="line"><span style="color:#8B949E">  # Get query parameters</span></span>
+<span class="line"><span style="color:#E6EDF3">  file_path </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> request.args.get(</span><span style="color:#A5D6FF">'a'</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">  encryption_key </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> request.args.get(</span><span style="color:#A5D6FF">'b'</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">  if</span><span style="color:#FF7B72"> not</span><span style="color:#E6EDF3"> file_path:</span></span>
+<span class="line"><span style="color:#FF7B72">    return</span><span style="color:#E6EDF3"> jsonify({</span><span style="color:#A5D6FF">"error"</span><span style="color:#E6EDF3">: </span><span style="color:#A5D6FF">"Query parameter 'a' is required for file path."</span><span style="color:#E6EDF3">}), </span><span style="color:#79C0FF">400</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">  try</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#8B949E">    # Get the Base64-encoded file content from the request body</span></span>
+<span class="line"><span style="color:#E6EDF3">    encoded_file </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> request.data.decode(</span><span style="color:#A5D6FF">'utf-8'</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">    file_content </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> base64.b64decode(encoded_file)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#8B949E">    # If encryption key is provided, encrypt the file content</span></span>
+<span class="line"><span style="color:#FF7B72">    if</span><span style="color:#E6EDF3"> encryption_key:</span></span>
+<span class="line"><span style="color:#FF7B72">      if</span><span style="color:#79C0FF"> len</span><span style="color:#E6EDF3">(encryption_key) </span><span style="color:#FF7B72">not</span><span style="color:#FF7B72"> in</span><span style="color:#E6EDF3"> (</span><span style="color:#79C0FF">16</span><span style="color:#E6EDF3">, </span><span style="color:#79C0FF">24</span><span style="color:#E6EDF3">, </span><span style="color:#79C0FF">32</span><span style="color:#E6EDF3">):</span></span>
+<span class="line"><span style="color:#FF7B72">        return</span><span style="color:#E6EDF3"> jsonify({</span><span style="color:#A5D6FF">"error"</span><span style="color:#E6EDF3">: </span><span style="color:#A5D6FF">"Encryption key must be 16, 24, or 32 bytes long."</span><span style="color:#E6EDF3">}), </span><span style="color:#79C0FF">400</span></span>
+<span class="line"><span style="color:#E6EDF3">      cipher </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> AES</span><span style="color:#E6EDF3">.new(encryption_key.encode(</span><span style="color:#A5D6FF">'utf-8'</span><span style="color:#E6EDF3">), </span><span style="color:#79C0FF">AES</span><span style="color:#E6EDF3">.</span><span style="color:#79C0FF">MODE_ECB</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">      file_content </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> cipher.encrypt(pad(file_content, </span><span style="color:#79C0FF">AES</span><span style="color:#E6EDF3">.block_size))</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#8B949E">    # Save the file</span></span>
+<span class="line"><span style="color:#E6EDF3">    os.makedirs(os.path.dirname(file_path), </span><span style="color:#FFA657">exist_ok</span><span style="color:#FF7B72">=</span><span style="color:#79C0FF">True</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#FF7B72">    with</span><span style="color:#79C0FF"> open</span><span style="color:#E6EDF3">(file_path, </span><span style="color:#A5D6FF">'wb'</span><span style="color:#E6EDF3">) </span><span style="color:#FF7B72">as</span><span style="color:#E6EDF3"> f:</span></span>
+<span class="line"><span style="color:#E6EDF3">      f.write(file_content)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">    return</span><span style="color:#E6EDF3"> jsonify({</span><span style="color:#A5D6FF">"message"</span><span style="color:#E6EDF3">: </span><span style="color:#A5D6FF">"File uploaded successfully."</span><span style="color:#E6EDF3">}), </span><span style="color:#79C0FF">200</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">  except</span><span style="color:#E6EDF3"> base64.binascii.Error:</span></span>
+<span class="line"><span style="color:#FF7B72">    return</span><span style="color:#E6EDF3"> jsonify({</span><span style="color:#A5D6FF">"error"</span><span style="color:#E6EDF3">: </span><span style="color:#A5D6FF">"Invalid Base64-encoded string."</span><span style="color:#E6EDF3">}), </span><span style="color:#79C0FF">400</span></span>
+<span class="line"><span style="color:#FF7B72">  except</span><span style="color:#79C0FF"> Exception</span><span style="color:#FF7B72"> as</span><span style="color:#E6EDF3"> e:</span></span>
+<span class="line"><span style="color:#FF7B72">    return</span><span style="color:#E6EDF3"> jsonify({</span><span style="color:#A5D6FF">"error"</span><span style="color:#E6EDF3">: </span><span style="color:#79C0FF">str</span><span style="color:#E6EDF3">(e)}), </span><span style="color:#79C0FF">500</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">if</span><span style="color:#79C0FF"> __name__</span><span style="color:#FF7B72"> ==</span><span style="color:#A5D6FF"> '__main__'</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#E6EDF3">  app.run(</span><span style="color:#FFA657">debug</span><span style="color:#FF7B72">=</span><span style="color:#79C0FF">True</span><span style="color:#E6EDF3">)</span></span></code></pre>
+<p>The main functionality of this code is that if someone would access the <code>/upload</code> endpoint with a POST request, the uploaded file will be encrypted with AES ECB with the value of the query parameter <code>b</code> as the key and then saved to a location defined by the value of the query parameter <code>a</code>. If the <code>b</code> query parameter is not supplied, then the file will not be encrypted. From this information, we need to somehow recover the logs of this container and also recover the saved files of this container.</p>
+<p>After searching for a while, the logs are actually stored in <code>/var/lib/docker/containers/4e5f2fa4c43bba8c3123d068f2ec24e4399a860113d41cccbeb75c428cb04ebf/4e5f2fa4c43bba8c3123d068f2ec24e4399a860113d41cccbeb75c428cb04ebf-json.log</code>.</p>
+<p><img src="/images/whale/whale_3.png" alt=""></p>
+<p>From the logs above, we can see all of the files that is saved and their encryption keys, except for <code>/tmp/interesting</code> where that file is actually not encrypted. We can also see that most of the files will be stored in the <code>/tmp</code> directory. To retrieve the saved files, we need to locate the last state of the container.</p>
+<p>After another searching, we found that the files are saved in <code>/var/lib/docker/overlay2/473883c2dc201325561e7ad936c8aacc8aa3f6e6dac46911adc4479c0059fb77/diff</code>.</p>
+<p><img src="/images/whale/whale_4.png" alt=""></p>
+<p>Since we already know that the <code>interesting</code> file is not encrypted, we can open that file first and it turns out that it contains the second part of our flag.</p>
+<p><img src="/images/whale/whale_5.png" alt=""></p>
+<p>The last thing we need to do is to create a script to decrypt the files we found based on the logs that we already analyzed.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#FF7B72">import</span><span style="color:#E6EDF3"> re</span></span>
+<span class="line"><span style="color:#FF7B72">from</span><span style="color:#E6EDF3"> Crypto.Cipher </span><span style="color:#FF7B72">import</span><span style="color:#79C0FF"> AES</span></span>
+<span class="line"><span style="color:#FF7B72">from</span><span style="color:#E6EDF3"> Crypto.Util.Padding </span><span style="color:#FF7B72">import</span><span style="color:#E6EDF3"> unpad</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">logs </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> open</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">'./4e5f2fa4c43bba8c3123d068f2ec24e4399a860113d41cccbeb75c428cb04ebf/4e5f2fa4c43bba8c3123d068f2ec24e4399a860113d41cccbeb75c428cb04ebf-json.log'</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">'r'</span><span style="color:#E6EDF3">).read().encode().decode(</span><span style="color:#A5D6FF">'unicode-escape'</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">paths </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> set</span><span style="color:#E6EDF3">(re.findall(</span><span style="color:#FF7B72">r</span><span style="color:#A5D6FF">'/upload</span><span style="color:#7EE787;font-weight:bold">\?</span><span style="color:#A5D6FF">a=</span><span style="color:#79C0FF">(.</span><span style="color:#FF7B72">+?</span><span style="color:#79C0FF">)</span><span style="color:#A5D6FF">&#x26;b=</span><span style="color:#79C0FF">(.</span><span style="color:#FF7B72">+?</span><span style="color:#79C0FF">)</span><span style="color:#A5D6FF"> '</span><span style="color:#E6EDF3">, logs))</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">for</span><span style="color:#E6EDF3"> path, key </span><span style="color:#FF7B72">in</span><span style="color:#E6EDF3"> paths:</span></span>
+<span class="line"><span style="color:#FFA657">    file</span><span style="color:#FF7B72"> =</span><span style="color:#79C0FF"> open</span><span style="color:#E6EDF3">(path[</span><span style="color:#79C0FF">1</span><span style="color:#E6EDF3">:], </span><span style="color:#A5D6FF">'rb'</span><span style="color:#E6EDF3">).read()</span></span>
+<span class="line"><span style="color:#E6EDF3">    cipher </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> AES</span><span style="color:#E6EDF3">.new(key.encode(</span><span style="color:#A5D6FF">'utf-8'</span><span style="color:#E6EDF3">), </span><span style="color:#79C0FF">AES</span><span style="color:#E6EDF3">.</span><span style="color:#79C0FF">MODE_ECB</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#FFA657">    file</span><span style="color:#FF7B72"> =</span><span style="color:#E6EDF3"> unpad(cipher.decrypt(</span><span style="color:#FFA657">file</span><span style="color:#E6EDF3">), </span><span style="color:#79C0FF">AES</span><span style="color:#E6EDF3">.block_size)</span></span>
+<span class="line"><span style="color:#FF7B72">    if</span><span style="color:#A5D6FF"> 'Part 3'</span><span style="color:#FF7B72"> in</span><span style="color:#FFA657"> file</span><span style="color:#E6EDF3">.decode(</span><span style="color:#A5D6FF">'utf-8'</span><span style="color:#E6EDF3">):</span></span>
+<span class="line"><span style="color:#79C0FF">        print</span><span style="color:#E6EDF3">(</span><span style="color:#FFA657">file</span><span style="color:#E6EDF3">.decode(</span><span style="color:#A5D6FF">'utf-8'</span><span style="color:#E6EDF3">))</span></span>
+<span class="line"><span style="color:#FF7B72">        break</span></span></code></pre>
+<p>After running this script, we will get the last part of the flag to complete this challenge.</p>
+<p><img src="/images/whale/whale_6.png" alt=""></p></div></article><aside class="toc" aria-label="On this page"><p>On this page</p><ol><li class="nested"><a href="#challenge-description">Challenge Description</a></li><li class="nested"><a href="#flag">Flag</a></li><li class="nested"><a href="#analysis-and-solution">Analysis and Solution</a></li></ol></aside></main><footer class="site-footer"><div><span>k3ng.xyz</span><span class="footer-note">2026</span></div></footer><script>
+      document.querySelector('.theme-toggle')?.addEventListener('click', () => {
+        const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+        const updateTheme = () => {
+          document.documentElement.dataset.theme = theme;
+          localStorage.setItem('theme', theme);
+        };
+
+        if (document.startViewTransition) {
+          document.startViewTransition(updateTheme);
+          return;
+        }
+
+        document.documentElement.classList.add('theme-transition');
+        updateTheme();
+        setTimeout(() => document.documentElement.classList.remove('theme-transition'), 650);
+      });
+    </script></body></html>

@@ -1,0 +1,23 @@
+---
+const pathname = Astro.url.pathname;
+const links = [
+  { href: '/blog', label: 'Blog' },
+  { href: '/writeups', label: 'Writeups' },
+  { href: '/about', label: 'About' },
+];
+---
+
+<header class="site-header">
+  <div class="header-inner">
+    <a class="wordmark" href="/" aria-label="Home" aria-current={pathname === '/' ? 'page' : undefined}>k3ng</a>
+    <nav aria-label="Primary navigation">
+      {links.map(({ href, label }) => (
+        <a href={href} aria-current={pathname.startsWith(href) ? 'page' : undefined}>{label}</a>
+      ))}
+    </nav>
+    <button class="theme-toggle" type="button" aria-label="Toggle color theme">
+      <span class="theme-light" aria-hidden="true">☼</span>
+      <span class="theme-dark" aria-hidden="true">☾</span>
+    </button>
+  </div>
+</header>

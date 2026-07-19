@@ -1,0 +1,120 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="CTF writeups, digital forensics, and cyber security notes by k3ng."><meta name="generator" content="Astro v7.1.1"><meta property="og:title" content="eavesdropped | k3ng.xyz"><meta property="og:description" content="CTF writeups, digital forensics, and cyber security notes by k3ng."><meta property="og:type" content="website"><link rel="icon" type="image/jpeg" href="/favicon.jpg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"><title>eavesdropped | k3ng.xyz</title><script>
+      const savedTheme = localStorage.getItem('theme');
+      const preferredTheme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.dataset.theme = savedTheme || preferredTheme;
+    </script><link rel="stylesheet" href="/_astro/BaseLayout.DZwBvaeU.css"></head><body><header class="site-header"><div class="header-inner"><a class="wordmark" href="/" aria-label="Home">k3ng</a><nav aria-label="Primary navigation"><a href="/blog">Blog</a><a href="/writeups" aria-current="page">Writeups</a><a href="/about">About</a></nav><button class="theme-toggle" type="button" aria-label="Toggle color theme"><span class="theme-light" aria-hidden="true">☼</span><span class="theme-dark" aria-hidden="true">☾</span></button></div></header><main class="article-shell has-toc"><article><header class="article-header"><p class="eyebrow">TSA Cyber Champion 2024</p><h1>eavesdropped</h1><ul class="article-tags" aria-label="Article tags"><li>trevorc2</li><li>git-object-recovery</li><li>python-bytecode</li><li>aes-cbc</li><li>zip-cracking</li></ul></header><div class="prose"><h3 id="challenge-description">Challenge Description</h3>
+<p>Recently, I discovered that a malicious actor has been using my proxy to obtain specific information from a particular server. Could you help me figure out what the attacker did?</p>
+<p>Author: nagi</p>
+<h3 id="flag">Flag</h3>
+<p><code>TSA{c0mmand_4nd_control_0ver_mitmprox1es_c1ee2e623a}</code></p>
+<hr>
+<h3 id="analysis">Analysis</h3>
+<p>We are given a file containing some sort of log of a network traffic. From the contents, we can see some sort of <code>git clone</code> operation happening and also some HTTP requests at the end of the log.</p>
+<p><img src="/images/eavesdropped/eavesdropped_1.png" alt=""></p>
+<p><img src="/images/eavesdropped/eavesdropped_2.png" alt=""></p>
+<p>Since Git uses Zlib as their compression algorithm, we can use <code>binwalk</code> to extract all Git objects.</p>
+<p><img src="/images/eavesdropped/eavesdropped_3.png" alt=""></p>
+<p>After decompressing the extracted Zlib files, there is one file that contains byte-compiled Python executable. After decompiling the file, we can see a client.py file from a tool called trevorc2.</p>
+<p><img src="/images/eavesdropped/eavesdropped_4.png" alt=""></p>
+<p>The trevorc2 tool is used to mask command execution using a cloned website. From the decompiled code, the payload itself will be stored on the nonce with the format <code>nonce="(.+?)"</code> and will be decrypted using AES with the result of XORing the reversed <code>CIPHER</code> variable with the <code>__author__</code> variable as the key. The resulting payload will contain the hostname and the command itself with the format <code>hostname::::command</code>. After executing the command, the output will be encrypted again using the same algorithm and key and will be hidden on the query parameter.</p>
+<p><img src="/images/eavesdropped/eavesdropped_5.png" alt=""></p>
+<p><img src="/images/eavesdropped/eavesdropped_6.png" alt=""></p>
+<p>We parsed the nonces and decrypt using the previously analyzed decryption flow to get the commands used.</p>
+<p><img src="/images/eavesdropped/eavesdropped_7.png" alt=""></p>
+<p>From the output, we can see a <code>flag.png</code> is being archived using a password with some kind of format. The first part of the password is the hostname, the second part is a random password from the first 64 passwords from the rockyou.txt wordlist. The last part is a number between 1 and 65537. Then, the Base64 representation of the <code>flag.zip</code> is outputted.</p>
+<h3 id="solution">Solution</h3>
+<p>Before getting the zip file, we need to create a custom wordlist from the analyzed format. The hostname is retrieved from the first part of the parsed nonces.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#FF7B72">from</span><span style="color:#E6EDF3"> itertools </span><span style="color:#FF7B72">import</span><span style="color:#E6EDF3"> product</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">rockyou </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> open</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"/usr/share/wordlists/rockyou.txt"</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"rb"</span><span style="color:#E6EDF3">).read().splitlines()[:</span><span style="color:#79C0FF">64</span><span style="color:#E6EDF3">]</span></span>
+<span class="line"><span style="color:#E6EDF3">hostname </span><span style="color:#FF7B72">=</span><span style="color:#A5D6FF"> "phionify"</span></span>
+<span class="line"><span style="color:#E6EDF3">number </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> range</span><span style="color:#E6EDF3">(</span><span style="color:#79C0FF">1</span><span style="color:#E6EDF3">, </span><span style="color:#79C0FF">65538</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">a </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> [[hostname], [x.decode(</span><span style="color:#A5D6FF">'utf-8'</span><span style="color:#E6EDF3">) </span><span style="color:#FF7B72">for</span><span style="color:#E6EDF3"> x </span><span style="color:#FF7B72">in</span><span style="color:#E6EDF3"> rockyou], [</span><span style="color:#79C0FF">str</span><span style="color:#E6EDF3">(x) </span><span style="color:#FF7B72">for</span><span style="color:#E6EDF3"> x </span><span style="color:#FF7B72">in</span><span style="color:#E6EDF3"> number]]</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">with</span><span style="color:#79C0FF"> open</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"wordlist.txt"</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"w"</span><span style="color:#E6EDF3">) </span><span style="color:#FF7B72">as</span><span style="color:#E6EDF3"> f:</span></span>
+<span class="line"><span style="color:#FF7B72">    for</span><span style="color:#E6EDF3"> x </span><span style="color:#FF7B72">in</span><span style="color:#E6EDF3"> product(</span><span style="color:#FF7B72">*</span><span style="color:#E6EDF3">a):</span></span>
+<span class="line"><span style="color:#E6EDF3">        f.write(x[</span><span style="color:#79C0FF">0</span><span style="color:#E6EDF3">] </span><span style="color:#FF7B72">+</span><span style="color:#A5D6FF"> "_"</span><span style="color:#FF7B72"> +</span><span style="color:#E6EDF3"> x[</span><span style="color:#79C0FF">1</span><span style="color:#E6EDF3">] </span><span style="color:#FF7B72">+</span><span style="color:#A5D6FF"> "_"</span><span style="color:#FF7B72"> +</span><span style="color:#E6EDF3"> x[</span><span style="color:#79C0FF">2</span><span style="color:#E6EDF3">] </span><span style="color:#FF7B72">+</span><span style="color:#A5D6FF"> "</span><span style="color:#FF7B72">\n</span><span style="color:#A5D6FF">"</span><span style="color:#E6EDF3">)</span></span></code></pre>
+<p>After creating a new wordlist, we can get the <code>flag.zip</code> by parsing the last query parameter on the log file.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#FF7B72">import</span><span style="color:#E6EDF3"> base64</span></span>
+<span class="line"><span style="color:#FF7B72">import</span><span style="color:#E6EDF3"> hashlib</span></span>
+<span class="line"><span style="color:#FF7B72">from</span><span style="color:#E6EDF3"> Crypto </span><span style="color:#FF7B72">import</span><span style="color:#E6EDF3"> Random</span></span>
+<span class="line"><span style="color:#FF7B72">from</span><span style="color:#E6EDF3"> Crypto.Cipher </span><span style="color:#FF7B72">import</span><span style="color:#79C0FF"> AES</span></span>
+<span class="line"><span style="color:#FF7B72">from</span><span style="color:#E6EDF3"> collections </span><span style="color:#FF7B72">import</span><span style="color:#E6EDF3"> Counter</span></span>
+<span class="line"><span style="color:#FF7B72">import</span><span style="color:#E6EDF3"> pwn</span></span>
+<span class="line"><span style="color:#FF7B72">import</span><span style="color:#E6EDF3"> re</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">class</span><span style="color:#FFA657"> AESCipher</span><span style="color:#E6EDF3">(</span><span style="color:#79C0FF">object</span><span style="color:#E6EDF3">):</span></span>
+<span class="line"><span style="color:#A5D6FF">    """</span></span>
+<span class="line"><span style="color:#A5D6FF">    A classical AES Cipher. Can use any size of data and any size of password thanks to padding.</span></span>
+<span class="line"><span style="color:#A5D6FF">    Also ensure the coherence and the type of the data with a unicode to byte converter.</span></span>
+<span class="line"><span style="color:#A5D6FF">    """</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">    def</span><span style="color:#79C0FF"> __init__</span><span style="color:#E6EDF3">(self, key):</span></span>
+<span class="line"><span style="color:#79C0FF">        self</span><span style="color:#E6EDF3">.bs </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> 16</span></span>
+<span class="line"><span style="color:#79C0FF">        self</span><span style="color:#E6EDF3">.key </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> hashlib.sha256(AESCipher.str_to_bytes(key)).digest()</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#D2A8FF">    @</span><span style="color:#79C0FF">staticmethod</span></span>
+<span class="line"><span style="color:#FF7B72">    def</span><span style="color:#D2A8FF"> str_to_bytes</span><span style="color:#E6EDF3">(data):</span></span>
+<span class="line"><span style="color:#E6EDF3">        u_type </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> type</span><span style="color:#E6EDF3">(</span><span style="color:#FF7B72">b</span><span style="color:#A5D6FF">''</span><span style="color:#E6EDF3">.decode(</span><span style="color:#A5D6FF">'utf8'</span><span style="color:#E6EDF3">))</span></span>
+<span class="line"><span style="color:#FF7B72">        if</span><span style="color:#79C0FF"> isinstance</span><span style="color:#E6EDF3">(data, u_type):</span></span>
+<span class="line"><span style="color:#FF7B72">            return</span><span style="color:#E6EDF3"> data.encode(</span><span style="color:#A5D6FF">'utf8'</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#FF7B72">        return</span><span style="color:#E6EDF3"> data</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">    def</span><span style="color:#D2A8FF"> _pad</span><span style="color:#E6EDF3">(self, s):</span></span>
+<span class="line"><span style="color:#FF7B72">        return</span><span style="color:#E6EDF3"> s </span><span style="color:#FF7B72">+</span><span style="color:#E6EDF3"> (</span><span style="color:#79C0FF">self</span><span style="color:#E6EDF3">.bs </span><span style="color:#FF7B72">-</span><span style="color:#79C0FF"> len</span><span style="color:#E6EDF3">(s) </span><span style="color:#FF7B72">%</span><span style="color:#79C0FF"> self</span><span style="color:#E6EDF3">.bs) </span><span style="color:#FF7B72">*</span><span style="color:#E6EDF3"> AESCipher.str_to_bytes(</span><span style="color:#79C0FF">chr</span><span style="color:#E6EDF3">(</span><span style="color:#79C0FF">self</span><span style="color:#E6EDF3">.bs </span><span style="color:#FF7B72">-</span><span style="color:#79C0FF"> len</span><span style="color:#E6EDF3">(s) </span><span style="color:#FF7B72">%</span><span style="color:#79C0FF"> self</span><span style="color:#E6EDF3">.bs))</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#D2A8FF">    @</span><span style="color:#79C0FF">staticmethod</span></span>
+<span class="line"><span style="color:#FF7B72">    def</span><span style="color:#D2A8FF"> _unpad</span><span style="color:#E6EDF3">(s):</span></span>
+<span class="line"><span style="color:#FF7B72">        return</span><span style="color:#E6EDF3"> s[:</span><span style="color:#FF7B72">-</span><span style="color:#79C0FF">ord</span><span style="color:#E6EDF3">(s[</span><span style="color:#79C0FF">len</span><span style="color:#E6EDF3">(s) </span><span style="color:#FF7B72">-</span><span style="color:#79C0FF"> 1</span><span style="color:#E6EDF3">:])]</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">    def</span><span style="color:#D2A8FF"> encrypt</span><span style="color:#E6EDF3">(self, raw):</span></span>
+<span class="line"><span style="color:#E6EDF3">        raw </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> self</span><span style="color:#E6EDF3">._pad(AESCipher.str_to_bytes(raw))</span></span>
+<span class="line"><span style="color:#E6EDF3">        iv </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> Random.new().read(</span><span style="color:#79C0FF">AES</span><span style="color:#E6EDF3">.block_size)</span></span>
+<span class="line"><span style="color:#E6EDF3">        cipher </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> AES</span><span style="color:#E6EDF3">.new(</span><span style="color:#79C0FF">self</span><span style="color:#E6EDF3">.key, </span><span style="color:#79C0FF">AES</span><span style="color:#E6EDF3">.</span><span style="color:#79C0FF">MODE_CBC</span><span style="color:#E6EDF3">, iv)</span></span>
+<span class="line"><span style="color:#FF7B72">        return</span><span style="color:#E6EDF3"> base64.b64encode(iv </span><span style="color:#FF7B72">+</span><span style="color:#E6EDF3"> cipher.encrypt(raw)).decode(</span><span style="color:#A5D6FF">'utf-8'</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">    def</span><span style="color:#D2A8FF"> decrypt</span><span style="color:#E6EDF3">(self, enc):</span></span>
+<span class="line"><span style="color:#E6EDF3">        enc </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> base64.b64decode(enc)</span></span>
+<span class="line"><span style="color:#E6EDF3">        iv </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> enc[:</span><span style="color:#79C0FF">AES</span><span style="color:#E6EDF3">.block_size]</span></span>
+<span class="line"><span style="color:#E6EDF3">        cipher </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> AES</span><span style="color:#E6EDF3">.new(</span><span style="color:#79C0FF">self</span><span style="color:#E6EDF3">.key, </span><span style="color:#79C0FF">AES</span><span style="color:#E6EDF3">.</span><span style="color:#79C0FF">MODE_CBC</span><span style="color:#E6EDF3">, iv)</span></span>
+<span class="line"><span style="color:#FF7B72">        return</span><span style="color:#79C0FF"> self</span><span style="color:#E6EDF3">._unpad(cipher.decrypt(enc[</span><span style="color:#79C0FF">AES</span><span style="color:#E6EDF3">.block_size:])).decode(</span><span style="color:#A5D6FF">'utf-8'</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79C0FF">ROOT_PATH_QUERY</span><span style="color:#FF7B72"> =</span><span style="color:#A5D6FF"> '/'</span></span>
+<span class="line"><span style="color:#79C0FF">SITE_PATH_QUERY</span><span style="color:#FF7B72"> =</span><span style="color:#A5D6FF"> '/search'</span></span>
+<span class="line"><span style="color:#79C0FF">QUERY_STRING</span><span style="color:#FF7B72"> =</span><span style="color:#A5D6FF"> 'q='</span></span>
+<span class="line"><span style="color:#79C0FF">CIPHER</span><span style="color:#FF7B72"> =</span><span style="color:#A5D6FF"> 'zxtWV82qG1Zj0DhyjSCYsB7iSkJNvRf4zO9sxSAqL6'</span></span>
+<span class="line"><span style="color:#E6EDF3">__author__ </span><span style="color:#FF7B72">=</span><span style="color:#A5D6FF"> 'Dave Kennedy (@HackingDave)'</span></span>
+<span class="line"><span style="color:#E6EDF3">cipher </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> AESCipher(</span><span style="color:#FFA657">key</span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3">pwn.xor(</span><span style="color:#79C0FF">CIPHER</span><span style="color:#E6EDF3">[::</span><span style="color:#FF7B72">-</span><span style="color:#79C0FF">1</span><span style="color:#E6EDF3">], __author__))</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">with</span><span style="color:#79C0FF"> open</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"flows"</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"rb"</span><span style="color:#E6EDF3">) </span><span style="color:#FF7B72">as</span><span style="color:#E6EDF3"> f:</span></span>
+<span class="line"><span style="color:#E6EDF3">    flows </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> f.read()</span></span>
+<span class="line"><span style="color:#E6EDF3">    ctr </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> Counter(re.findall(</span><span style="color:#FF7B72">rb</span><span style="color:#A5D6FF">'search</span><span style="color:#7EE787;font-weight:bold">\?</span><span style="color:#A5D6FF">q=</span><span style="color:#79C0FF">(.</span><span style="color:#FF7B72">+?</span><span style="color:#79C0FF">)</span><span style="color:#7EE787;font-weight:bold">\,</span><span style="color:#A5D6FF">'</span><span style="color:#E6EDF3">, flows)).most_common()[</span><span style="color:#FF7B72">-</span><span style="color:#79C0FF">1</span><span style="color:#E6EDF3">]</span></span>
+<span class="line"><span style="color:#E6EDF3">    data </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> base64.b64decode(ctr[</span><span style="color:#79C0FF">0</span><span style="color:#E6EDF3">])</span></span>
+<span class="line"><span style="color:#E6EDF3">    data </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> cipher.decrypt(data)</span></span>
+<span class="line"><span style="color:#E6EDF3">    data </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> data.split(</span><span style="color:#A5D6FF">'::::'</span><span style="color:#E6EDF3">)[</span><span style="color:#79C0FF">1</span><span style="color:#E6EDF3">]</span></span>
+<span class="line"><span style="color:#E6EDF3">    data </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> eval</span><span style="color:#E6EDF3">(data).decode(</span><span style="color:#A5D6FF">'utf-8'</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">    data </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> data.replace(</span><span style="color:#A5D6FF">'</span><span style="color:#FF7B72">\n</span><span style="color:#A5D6FF">'</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">''</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#FF7B72">    with</span><span style="color:#79C0FF"> open</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"flag.zip"</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"wb"</span><span style="color:#E6EDF3">) </span><span style="color:#FF7B72">as</span><span style="color:#E6EDF3"> f:</span></span>
+<span class="line"><span style="color:#E6EDF3">        f.write(base64.b64decode(data))</span></span></code></pre>
+<p>Then we can brute-force the zip file using <code>john</code>.</p>
+<p><img src="/images/eavesdropped/eavesdropped_8.png" alt=""></p>
+<p>After opening the zip file, the flag will be stored as a QR code.</p>
+<p><img src="/images/eavesdropped/eavesdropped_9.png" alt=""></p></div></article><aside class="toc" aria-label="On this page"><p>On this page</p><ol><li class="nested"><a href="#challenge-description">Challenge Description</a></li><li class="nested"><a href="#flag">Flag</a></li><li class="nested"><a href="#analysis">Analysis</a></li><li class="nested"><a href="#solution">Solution</a></li></ol></aside></main><footer class="site-footer"><div><span>k3ng.xyz</span><span class="footer-note">2026</span></div></footer><script>
+      document.querySelector('.theme-toggle')?.addEventListener('click', () => {
+        const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+        const updateTheme = () => {
+          document.documentElement.dataset.theme = theme;
+          localStorage.setItem('theme', theme);
+        };
+
+        if (document.startViewTransition) {
+          document.startViewTransition(updateTheme);
+          return;
+        }
+
+        document.documentElement.classList.add('theme-transition');
+        updateTheme();
+        setTimeout(() => document.documentElement.classList.remove('theme-transition'), 650);
+      });
+    </script></body></html>

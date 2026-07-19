@@ -1,0 +1,280 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="An incident report based on the Project Victoria case from the SOCSIM course."><meta name="generator" content="Astro v7.1.1"><meta property="og:title" content="Project Victoria Incident Report | k3ng.xyz"><meta property="og:description" content="An incident report based on the Project Victoria case from the SOCSIM course."><meta property="og:type" content="website"><meta property="og:image" content="http://localhost:4321/images/project_victoria/project_victoria_2.png"><link rel="icon" type="image/jpeg" href="/favicon.jpg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"><title>Project Victoria Incident Report | k3ng.xyz</title><script>
+      const savedTheme = localStorage.getItem('theme');
+      const preferredTheme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.dataset.theme = savedTheme || preferredTheme;
+    </script><link rel="stylesheet" href="/_astro/BaseLayout.DZwBvaeU.css"></head><body><header class="site-header"><div class="header-inner"><a class="wordmark" href="/" aria-label="Home">k3ng</a><nav aria-label="Primary navigation"><a href="/blog" aria-current="page">Blog</a><a href="/writeups">Writeups</a><a href="/about">About</a></nav><button class="theme-toggle" type="button" aria-label="Toggle color theme"><span class="theme-light" aria-hidden="true">☼</span><span class="theme-dark" aria-hidden="true">☾</span></button></div></header><main class="article-shell has-toc"><article><header class="article-header"><p class="eyebrow">Blog</p><h1>Project Victoria Incident Report</h1><p class="article-description">An incident report based on the Project Victoria case from the SOCSIM course.</p><time datetime="2026-07-01T00:00:00.000Z">July 1, 2026</time></header><div class="prose"><h1 id="️-bec-investigation-report">🕵️ BEC Investigation Report</h1>
+<blockquote>
+<p><strong>Platform:</strong> SOC Simulation Project — WDLabs<br>
+<strong>Environment:</strong> Microsoft 365 Unified Audit Logs / Microsoft Sentinel</p>
+</blockquote>
+<hr>
+<h2 id="-case-details">📋 Case Details</h2>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Field</th><th>Value</th></tr></thead><tbody><tr><td><strong>WDLabs Case Name</strong></td><td>Project Victoria</td></tr><tr><td><strong>Case Reference</strong></td><td>Case 001</td></tr><tr><td><strong>Affected Account</strong></td><td><code>donald.anderson@wdlabs.com.au</code></td></tr><tr><td><strong>Incident Date Range</strong></td><td><code>2026-03-07</code> — <code>2026-03-10</code></td></tr><tr><td><strong>Investigation Date</strong></td><td>2026-06-10</td></tr><tr><td><strong>Analyst</strong></td><td>k3ng</td></tr></tbody></table>
+<hr>
+<h2 id="1-attack-narrative">1. Attack Narrative</h2>
+<p>Between 7 March 2026 and 10 March 2026, a threat actor compromised WDLabs’ corporate Microsoft cloud environment, resulting in the unauthorised exfiltration of multiple internal documents and the launch of an internal phishing campaign. The initial breach occurred via an internal phishing email sent from <code>dalan.coburn@wdlabs.com.au</code> to <code>donald.anderson@wdlabs.com.au</code>, suggesting that the sender’s account was compromised by the threat actor. This led to the unauthorised access of the <code>donald.anderson@wdlabs.com.au</code> account from an unusual external IP. The impact of this incident is account compromise and internal data theft. The threat actor managed to exfiltrate multiple internal PDF documents from the company’s SharePoint site. They also leveraged the compromised account of Donald Anderson to gather information about the company to launch targeted phishing campaigns to other staff members of WDLabs.</p>
+<hr>
+<h2 id="2-timeline-of-events">2. Timeline of Events</h2>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>Time (UTC)</th><th>Activity</th><th>Detail</th><th>Technique</th></tr></thead><tbody><tr><td>07/03/2026 02:19:50</td><td>Suspicious Email</td><td>A suspicious email was sent by <code>dalan.coburn@wdlabs.com.au</code> to <code>donald.anderson@wdlabs.com.au</code> regarding training.</td><td>T1534 - Internal Spearphishing</td></tr><tr><td>07/03/2026 02:27:32</td><td>Initial Access</td><td>First malicious login by <code>15.135.61.79</code> to<code>donald.anderson@wdlabs.com.au</code>.</td><td>T1078.004 - Valid Accounts: Cloud Accounts</td></tr><tr><td>07/03/2026 02:49:55 - 10/03/2026 10:15:51</td><td>Email Access</td><td>Multiple emails were read by the threat actor, likely to gather information about the victim.</td><td>T1114.002 - Email Collection: Remote Email Collection</td></tr><tr><td>09/03/2026 07:10:45</td><td>Malicious Inbox Rule</td><td>A new inbox rule named <code>.</code> was created to redirect incoming emails from <code>naomi.hunter@wdlabs.com.au</code> to <code>RSS Feeds</code>.</td><td>T1564.008 - Hide Artifacts: Email Hiding Rules</td></tr><tr><td>09/03/2026 07:21:05 - 10/03/2026 09:44:34</td><td>SharePoint Exfiltration</td><td>Multiple PDF files was exfiltrated from the <code>WDLabsOperations</code> SharePoint site.</td><td>T1530 - Data from Cloud Storage</td></tr><tr><td>10/03/2026 09:51:40</td><td>Suspicious Email</td><td>Email sent from <code>donald.anderson@wdlabs.com.au</code> to <code>naomi.hunter@wdlabs.com.au</code> with the subject <code>Report</code>.</td><td>T1534 - Internal Spearphishing</td></tr></tbody></table>
+<hr>
+<h2 id="3-findings">3. Findings</h2>
+<h3 id="31-initial-access">3.1 Initial Access</h3>
+<p>On 7 March 2026 02:19:50 UTC, the <code>dalan.coburn@wdlabs.com.au</code> account sent malicious emails to the target account <code>donald.anderson@wdlabs.com.au</code>. From our analysis, one email  was received by <code>donald.anderson@wdlabs.com.au</code>  and was titled <code>URGENT: Training</code> . The email contains a message requesting the victim to click on a link that supposedly contains a cyber training. The sender also requested the recipient to complete training by close of business (CoB). At the time of investigation, we could not verify the contents of the URL sent  by <code>dalan.coburn@wdlabs.com.au</code>.</p>
+<p>Around 8 minutes after <code>donald.anderson@wdlabs.com.au</code> received the suspicious email, we recognised a login with the <code>donald.anderson@wdlabs.com.au</code> account from <code>15.135.61.79</code>. The geo-location of the IP was identified to be in Sydney, Australia, which did not match the expected baseline of Donald Anderson’s usual activities therefore marking it as a malicious activity. We suspect that the URL sent by <code>dalan.coburn@wdlabs.com.au</code> was a phishing link to harvest the victim’s credentials, allowing the threat actor to log in.</p>
+<hr>
+<h3 id="32-unauthorised-activity">3.2 Unauthorised Activity</h3>
+<p>On 9 March 2026 07:10:45 UTC, the threat actor created a new inbox rule on the <code>donald.anderson@wdlabs.com.au</code> account named <code>.</code> from the IP <code>91.217.249.193:17130</code>. The inbox rule was set up to redirect emails from <code>naomi.hunter@wdlabs.com.au</code> to the <code>RSS Feeds</code> folder.  The rule was also set up to always mark captured emails as read. This technique is commonly used to hide any possible security alerts or responses to phishing emails that may be sent to the <code>donald.anderson@wdlabs.com.au</code> account to a less visible folder.</p>
+<p>On 10 March 2026 09:51:40 UTC, the threat actor sent an email from the <code>donald.anderson@wdlabs.com.au</code> account to <code>naomi.hunter@wdlabs.com.au</code> using the subject <code>Report</code>. The email contains a URL of a file hosted inside the <code>WDLabsOperation</code> SharePoint site. We could not verify the contents of the URL but based on the URL format, it is likely that the URL would return a list of files and folders inside the <code>Shared Documents</code> folder. Due to the privilege of the threat actor, it is possible that the threat actor created a malicious file inside of the trusted SharePoint site to be used as a phishing vector specifically targeted to Naomi Hunter.</p>
+<hr>
+<h3 id="33-data-access">3.3 Data Access</h3>
+<p>On 7 March 2026 02:49:55 UTC, the threat actor accessed multiple emails from the <code>donald.anderson@wdlabs.com.au</code> Exchange mailbox. It is likely that the threat actor was gathering information about the victim and selecting their next target. This activity repeats around once per day until 10 March 2026 10:15:51 UTC.</p>
+<p>On 9 March 2026 07:21:05 UTC, we discovered that the threat actor managed to download multiple PDF files from the <code>WDLabsOperations</code> SharePoint site, specifically inside the <code>Shared Documents</code> folder. We could not identify the contents of the files exfiltrated by the threat actor. This activity also repeats until 10 March 2026 09:51:40 UTC.</p>
+<hr>
+<h2 id="4-lessons-learned">4. Lessons Learned</h2>
+<p>I particularly struggled with organisation of evidences when doing this investigation, where queries, screenshots and other evidence were scattered across different files. For upcoming investigations, I would create a separate Markdown file to dump all evidences that is structured based on timestamps. I would also rename screenshots to attribute it to a certain event and/or timestamp.</p>
+<p>One thing I learned from this investigation is to always be suspicious of any activity. I almost disregarded the first suspicious email due to the sender being the lab creator, but based on the timing and contents of the email, that event is the only explanation of the malicious initial access. Another thing is to always have an updated timeline of the events occurring on the incident. This helps me tremendously when trying to make sense of what things the threat actor is doing and figuring out if every event has an explanation of why it happened.</p>
+<hr>
+<h2 id="5-indicators-of-compromise">5. Indicators of Compromise</h2>
+<h3 id="51-ip-addresses">5.1 IP Addresses</h3>
+<ul>
+<li><code>104[.]234[.]32[.]143</code></li>
+<li><code>173[.]239[.]229[.]83</code></li>
+<li><code>52[.]106[.]216[.]166</code></li>
+<li><code>181[.]215[.]65[.]116</code></li>
+<li><code>104[.]234[.]32[.]142</code></li>
+<li><code>181[.]215[.]65[.]117</code></li>
+<li><code>104[.]234[.]32[.]115</code></li>
+<li><code>104[.]234[.]32[.]118</code></li>
+<li><code>45[.]133[.]5[.]165</code></li>
+<li><code>45[.]133[.]5[.]172</code></li>
+<li><code>45[.]133[.]5[.]15</code></li>
+<li><code>45[.]133[.]5[.]24</code></li>
+<li><code>45[.]133[.]5[.]52</code></li>
+<li><code>45[.]133[.]5[.]48</code></li>
+<li><code>91[.]217[.]249[.]193[:]17130</code></li>
+<li><code>91[.]217[.]249[.]193</code></li>
+<li><code>91[.]217[.]249[.]214</code></li>
+<li><code>91[.]217[.]249[.]210</code></li>
+<li><code>91[.]217[.]249[.]220</code></li>
+<li><code>54[.]206[.]115[.]107</code></li>
+<li><code>15[.]135[.]61[.]79</code></li>
+</ul>
+<h3 id="52-email-addresses">5.2 Email Addresses</h3>
+<ul>
+<li><code>dalan[.]coburn@wdlabs[.]com[.]au</code></li>
+</ul>
+<h3 id="53-urls">5.3 URLs</h3>
+<ul>
+<li><code>hxxps[://]login[.]superlegitlogin[.]wdlabs[.]com[.]au/McPdBMLl</code></li>
+<li><code>hxxps[://]wdlabs[.]sharepoint[.]com/sites/WDLabsOperations/Shared%20Documents/Forms/AllItems[.]aspx?viewid=8bd96870-5971-4d24-a1ff-6462316e46f3</code></li>
+</ul>
+<h2 id="54-session-ids">5.4 Session IDs</h2>
+<ul>
+<li><code>002ee01a-a45e-12bb-2b80-7cb66d68f1cd</code></li>
+<li><code>002ee01a-6208-9739-8a17-a7adc52c9df8</code></li>
+</ul>
+<h2 id="6-appendix">6. Appendix</h2>
+<h3 id="61-suspicious-email-evidence">6.1 Suspicious Email Evidence</h3>
+<p>Using the query below, we detected 4 emails sent in quick succession using similar subjects regarding cyber security training.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>FROM socsim-bec1*</span></span>
+<span class="line"><span>| WHERE source == "mtl" AND Received &#x3C; "2026-03-07T02:35:40Z" AND RecipientAddress == "donald.anderson@wdlabs.com.au"</span></span>
+<span class="line"><span>| SORT Received</span></span>
+<span class="line"><span>| KEEP Received, SenderAddress, RecipientAddress, Subject</span></span></code></pre>
+<p><img src="/images/project_victoria/project_victoria_1.png" alt="">
+Upon receiving the evidence of Donald Anderson’s mailbox, we are able to locate the contents of the last email in the previous evidence. Based on the contents, we identified a URL that may be used by Dalan Coburn to steal credentials from Donald Anderson.
+<img src="/images/project_victoria/project_victoria_2.png" alt=""></p>
+<h3 id="62-initial-access-evidence">6.2 Initial Access Evidence</h3>
+<p>To identify unusual access from the <code>donald.anderson@wdlabs.com.au</code> account. We executed a query to consolidate client IP addresses and session IDs from the Microsoft 365 Unified Access Logs and grouped them based on the session ID.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>FROM socsim-bec1*</span></span>
+<span class="line"><span>| EVAL SourceIp = COALESCE(ClientIP, ClientIPAddress)</span></span>
+<span class="line"><span>| EVAL MasterSessionId = COALESCE(MV_FIRST(DeviceProperties.Value.keyword), AppAccessContext.AADSessionId)</span></span>
+<span class="line"><span>| WHERE source == "ual" AND UserId == "donald.anderson@wdlabs.com.au" AND MasterSessionId IS NOT NULL</span></span>
+<span class="line"><span>| STATS Count = COUNT(*), FirstAccess = MIN(CreationTime), SourceIps = MV_CONCAT(VALUES(SourceIp), "\n") BY MasterSessionId</span></span>
+<span class="line"><span>| SORT Count DESC</span></span>
+<span class="line"><span>| KEEP FirstAccess, MasterSessionId, SourceIps, Count</span></span></code></pre>
+<p><img src="/images/project_victoria/project_victoria_3.png" alt="">
+After identifying all IP addresses and session IDs used, we ran all IPs to an API to geo-locate the IP. Results from the API concludes that there are multiple IP addresses that is located outside of Melbourne, Australia.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>IP                     Country        City</span></span>
+<span class="line"><span>-------------------------------------------------</span></span>
+<span class="line"><span>52[.]106[.]216[.]166   Australia      Melbourne</span></span>
+<span class="line"><span>103[.]51[.]113[.]25    Australia      Melbourne</span></span>
+<span class="line"><span>52[.]123[.]162[.]160   Australia      Melbourne</span></span>
+<span class="line"><span>20[.]190[.]142[.]172   Australia      Melbourne</span></span>
+<span class="line"><span>45[.]133[.]5[.]165     Australia      Sydney</span></span>
+<span class="line"><span>45[.]133[.]5[.]172     Australia      Sydney</span></span>
+<span class="line"><span>45[.]133[.]5[.]15      Australia      Sydney</span></span>
+<span class="line"><span>45[.]133[.]5[.]24      Australia      Sydney</span></span>
+<span class="line"><span>45[.]133[.]5[.]52      Australia      Sydney</span></span>
+<span class="line"><span>45[.]133[.]5[.]48      Australia      Sydney</span></span>
+<span class="line"><span>54[.]206[.]115[.]107   Australia      Sydney</span></span>
+<span class="line"><span>15[.]135[.]61[.]79     Australia      Sydney</span></span>
+<span class="line"><span>52[.]123[.]161[.]122   Australia      The Rocks</span></span>
+<span class="line"><span>91[.]217[.]249[.]193   Germany        Frankfurt am Main</span></span>
+<span class="line"><span>91[.]217[.]249[.]214   Germany        Frankfurt am Main</span></span>
+<span class="line"><span>91[.]217[.]249[.]210   Germany        Frankfurt am Main</span></span>
+<span class="line"><span>91[.]217[.]249[.]220   Germany        Frankfurt am Main</span></span>
+<span class="line"><span>104[.]234[.]32[.]143   United States  Chicago</span></span>
+<span class="line"><span>181[.]215[.]65[.]116   United States  Chicago</span></span>
+<span class="line"><span>104[.]234[.]32[.]142   United States  Chicago</span></span>
+<span class="line"><span>181[.]215[.]65[.]117   United States  Chicago</span></span>
+<span class="line"><span>104[.]234[.]32[.]115   United States  Chicago</span></span>
+<span class="line"><span>104[.]234[.]32[.]118   United States  Chicago</span></span>
+<span class="line"><span>173[.]239[.]229[.]83   United States  New York</span></span></code></pre>
+<p>We can also conclude that the <code>002df5ba-4e21-5811-12c2-51c77261399e</code> session ID is considered the baseline and should be ignored since all IP addresses that uses that session ID are located in Melbourne, Australia. We identified two malicious session ID: <code>002ee01a-6208-9739-8a17-a7adc52c9df8</code> and <code>002ee01a-a45e-12bb-2b80-7cb66d68f1cd</code>.</p>
+<p>To identify the initial access timestamp, we crafted a query to get all activities coming from the malicious session IDs and returning the timestamp of the first event.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>FROM socsim-bec1*</span></span>
+<span class="line"><span>| EVAL SourceIp = COALESCE(ClientIP, ClientIPAddress)</span></span>
+<span class="line"><span>| EVAL MasterSessionId = COALESCE(MV_FIRST(DeviceProperties.Value.keyword), AppAccessContext.AADSessionId)</span></span>
+<span class="line"><span>| WHERE source == "ual" AND MasterSessionId IN ("002ee01a-a45e-12bb-2b80-7cb66d68f1cd", "002ee01a-6208-9739-8a17-a7adc52c9df8") AND Operation == "UserLoggedIn"</span></span>
+<span class="line"><span>| SORT CreationTime</span></span>
+<span class="line"><span>| LIMIT 1</span></span>
+<span class="line"><span>| KEEP CreationTime, SourceIp, Workload, Operation</span></span></code></pre>
+<p><img src="/images/project_victoria/project_victoria_4.png" alt="">
+Upon further inspection using the query below, the <code>002ee01a-6208-9739-8a17-a7adc52c9df8</code> session ID was only used by the threat actor to log in. Therefore, the investigation will focus on the <code>002ee01a-a45e-12bb-2b80-7cb66d68f1cd</code> session ID.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>FROM socsim-bec1*</span></span>
+<span class="line"><span>| EVAL SourceIp = COALESCE(ClientIP, ClientIPAddress)</span></span>
+<span class="line"><span>| EVAL MasterSessionId = COALESCE(MV_FIRST(DeviceProperties.Value.keyword), AppAccessContext.AADSessionId)</span></span>
+<span class="line"><span>| WHERE source == "ual" AND MasterSessionId == "002ee01a-6208-9739-8a17-a7adc52c9df8"</span></span>
+<span class="line"><span>| KEEP CreationTime, SourceIp, Workload, Operation</span></span>
+<span class="line"><span>| SORT CreationTime</span></span></code></pre>
+<p><img src="/images/project_victoria/project_victoria_5.png" alt=""></p>
+<h3 id="63-email-read-access-evidence">6.3 Email Read Access Evidence</h3>
+<p>Using the query below, we identified multiple email’s that has been accessed by the threat actor. We suspect that the threat actor is gathering information about the victim and ultimately find their next target.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>FROM socsim-bec1*</span></span>
+<span class="line"><span>| WHERE source == "ual"</span></span>
+<span class="line"><span>| EVAL SourceIp = COALESCE(ClientIP, ClientIPAddress)</span></span>
+<span class="line"><span>| EVAL MasterSessionId = COALESCE(MV_FIRST(DeviceProperties.Value.keyword), AppAccessContext.AADSessionId)</span></span>
+<span class="line"><span>| WHERE UserId == "donald.anderson@wdlabs.com.au"</span></span>
+<span class="line"><span>  AND MasterSessionId == "002ee01a-a45e-12bb-2b80-7cb66d68f1cd"</span></span>
+<span class="line"><span>  AND Workload == "Exchange" AND Folders.FolderItems.Subject IS NOT NULL</span></span>
+<span class="line"><span>| MV_EXPAND Folders.FolderItems.Subject</span></span>
+<span class="line"><span>| STATS CreationTime = MAX(CreationTime), </span></span>
+<span class="line"><span>        Subject = MAX(Folders.FolderItems.Subject),</span></span>
+<span class="line"><span>        Type = MAX(OperationProperties.Value) BY Folders.FolderItems.Subject</span></span>
+<span class="line"><span>| KEEP CreationTime, Subject, Type</span></span>
+<span class="line"><span>| SORT CreationTime</span></span></code></pre>
+<p><img src="/images/project_victoria/project_victoria_6.png" alt=""></p>
+<h3 id="64-malicious-inbox-rule-evidence">6.4 Malicious Inbox Rule Evidence</h3>
+<p>To identify the maliciously created inbox rule, we used a query to filter the Unified Access Logs to only return the <code>New-InboxRule</code> operation that is responsible for inbox rule creations.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>FROM socsim-bec1*</span></span>
+<span class="line"><span>| EVAL SourceIp = COALESCE(ClientIP, ClientIPAddress)</span></span>
+<span class="line"><span>| EVAL MasterSessionId = COALESCE(MV_FIRST(DeviceProperties.Value.keyword), AppAccessContext.AADSessionId)</span></span>
+<span class="line"><span>| WHERE source == "ual" AND MasterSessionId == "002ee01a-a45e-12bb-2b80-7cb66d68f1cd" AND Operation == "New-InboxRule"</span></span>
+<span class="line"><span>| KEEP CreationTime, UserId, Workload, Operation, Parameters.Name, Parameters.Value</span></span></code></pre>
+<p><img src="/images/project_victoria/project_victoria_7.png" alt="">
+Based on the results, we determined that the threat actor created an inbox rule called <code>.</code> to mark all emails sent by <code>naomi.hunter@wdlabs.com.au</code> as read and redirects them to <code>RSS Feeds</code>. This tactic is used by the threat actor to hide any alerts or concerned responses sent to the victim.</p>
+<h3 id="65-sharepoint-exfiltration-evidence">6.5 SharePoint Exfiltration Evidence</h3>
+<p>We ran a query to return any <code>FileDownloaded</code> events on SharePoint from the malicious session ID. After execution, we detected multiple exfiltration events of PDF files from the <code>Shared Documents</code> folder of the <code>WDLabsOperation</code> SharePoint site.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>FROM socsim-bec1*</span></span>
+<span class="line"><span>| EVAL SourceIp = COALESCE(ClientIP, ClientIPAddress)</span></span>
+<span class="line"><span>| EVAL MasterSessionId = COALESCE(MV_FIRST(DeviceProperties.Value.keyword), AppAccessContext.AADSessionId)</span></span>
+<span class="line"><span>| WHERE source == "ual" AND MasterSessionId == "002ee01a-a45e-12bb-2b80-7cb66d68f1cd" AND Workload == "SharePoint" AND Operation == "FileDownloaded"</span></span>
+<span class="line"><span>| KEEP CreationTime, SourceIp, ObjectId</span></span>
+<span class="line"><span>| SORT CreationTime</span></span></code></pre>
+<p><img src="/images/project_victoria/project_victoria_8.png" alt=""></p>
+<h3 id="66-suspicious-email-evidence">6.6 Suspicious Email Evidence</h3>
+<p>We crafted a query to return the email sent by Donald Anderson to Naomi Hunter after the identified initial access event. We can identify the subject used by the threat actor is <code>Report</code>.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>FROM socsim-bec1*</span></span>
+<span class="line"><span>| WHERE source == "mtl" AND SenderAddress == "donald.anderson@wdlabs.com.au" AND RecipientAddress == "naomi.hunter@wdlabs.com.au" AND Received > "2026-03-07T12:35:40Z"</span></span>
+<span class="line"><span>| KEEP Received, Subject</span></span>
+<span class="line"><span>| Sort Received</span></span></code></pre>
+<p><img src="/images/project_victoria/project_victoria_9.png" alt="">
+From the mailbox evidence, we concluded that the previously mentioned email contains a SharePoint URL. Based on the URL format, we can infer that the URL returns a certain view in the <code>Shared Documents/Forms</code> directory of the <code>WDLabsOperations</code> SharePoint site.
+<img src="/images/project_victoria/project_victoria_10.png" alt=""></p></div></article><aside class="toc" aria-label="On this page"><p>On this page</p><ol><li><a href="#-case-details">📋 Case Details</a></li><li><a href="#1-attack-narrative">1. Attack Narrative</a></li><li><a href="#2-timeline-of-events">2. Timeline of Events</a></li><li><a href="#3-findings">3. Findings</a></li><li class="nested"><a href="#31-initial-access">3.1 Initial Access</a></li><li class="nested"><a href="#32-unauthorised-activity">3.2 Unauthorised Activity</a></li><li class="nested"><a href="#33-data-access">3.3 Data Access</a></li><li><a href="#4-lessons-learned">4. Lessons Learned</a></li><li><a href="#5-indicators-of-compromise">5. Indicators of Compromise</a></li><li class="nested"><a href="#51-ip-addresses">5.1 IP Addresses</a></li><li class="nested"><a href="#52-email-addresses">5.2 Email Addresses</a></li><li class="nested"><a href="#53-urls">5.3 URLs</a></li><li><a href="#54-session-ids">5.4 Session IDs</a></li><li><a href="#6-appendix">6. Appendix</a></li><li class="nested"><a href="#61-suspicious-email-evidence">6.1 Suspicious Email Evidence</a></li><li class="nested"><a href="#62-initial-access-evidence">6.2 Initial Access Evidence</a></li><li class="nested"><a href="#63-email-read-access-evidence">6.3 Email Read Access Evidence</a></li><li class="nested"><a href="#64-malicious-inbox-rule-evidence">6.4 Malicious Inbox Rule Evidence</a></li><li class="nested"><a href="#65-sharepoint-exfiltration-evidence">6.5 SharePoint Exfiltration Evidence</a></li><li class="nested"><a href="#66-suspicious-email-evidence">6.6 Suspicious Email Evidence</a></li></ol></aside></main><footer class="site-footer"><div><span>k3ng.xyz</span><span class="footer-note">2026</span></div></footer><script>
+      document.querySelector('.theme-toggle')?.addEventListener('click', () => {
+        const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+        const updateTheme = () => {
+          document.documentElement.dataset.theme = theme;
+          localStorage.setItem('theme', theme);
+        };
+
+        if (document.startViewTransition) {
+          document.startViewTransition(updateTheme);
+          return;
+        }
+
+        document.documentElement.classList.add('theme-transition');
+        updateTheme();
+        setTimeout(() => document.documentElement.classList.remove('theme-transition'), 650);
+      });
+    </script></body></html>

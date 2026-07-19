@@ -1,0 +1,50 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="CTF writeups, digital forensics, and cyber security notes by k3ng."><meta name="generator" content="Astro v7.1.1"><meta property="og:title" content="101 - Forensics | k3ng.xyz"><meta property="og:description" content="CTF writeups, digital forensics, and cyber security notes by k3ng."><meta property="og:type" content="website"><link rel="icon" type="image/jpeg" href="/favicon.jpg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"><title>101 - Forensics | k3ng.xyz</title><script>
+      const savedTheme = localStorage.getItem('theme');
+      const preferredTheme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.dataset.theme = savedTheme || preferredTheme;
+    </script><link rel="stylesheet" href="/_astro/BaseLayout.DZwBvaeU.css"></head><body><header class="site-header"><div class="header-inner"><a class="wordmark" href="/" aria-label="Home">k3ng</a><nav aria-label="Primary navigation"><a href="/blog">Blog</a><a href="/writeups" aria-current="page">Writeups</a><a href="/about">About</a></nav><button class="theme-toggle" type="button" aria-label="Toggle color theme"><span class="theme-light" aria-hidden="true">☼</span><span class="theme-dark" aria-hidden="true">☾</span></button></div></header><main class="article-shell has-toc"><article><header class="article-header"><p class="eyebrow">TSA Cyber Champion 2024</p><h1>101 - Forensics</h1><ul class="article-tags" aria-label="Article tags"><li>pcap-analysis</li><li>icmp</li><li>data-carving</li><li>png</li></ul></header><div class="prose"><h3 id="challenge-description">Challenge Description</h3>
+<p>Forensics 101</p>
+<p>Author: Fedra</p>
+<h3 id="flag">Flag</h3>
+<p><code>TSA{Forensic_101_0d1b25a70976d70f}</code></p>
+<hr>
+<h3 id="analysis">Analysis</h3>
+<p>We are given a packet capture file which contains many ICMP packets. From one of the ICMP packets, we can see that the data transmitted contains the first 16 bytes of a PNG header that is repeated.</p>
+<p><img src="/images/101_forensics/101_forensics_1.png" alt=""></p>
+<h3 id="solution">Solution</h3>
+<p>From the analysis, we need to create a script to get the first 16 bytes of the data from every ICMP packets and parse all the PNG files from that. The resulting PNG files will form a flag.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#FF7B72">from</span><span style="color:#E6EDF3"> scapy.all </span><span style="color:#FF7B72">import</span><span style="color:#FF7B72"> *</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">packets </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> rdpcap(</span><span style="color:#A5D6FF">"./101.pcap"</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">out </span><span style="color:#FF7B72">=</span><span style="color:#FF7B72"> b</span><span style="color:#A5D6FF">''</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">for</span><span style="color:#E6EDF3"> packet </span><span style="color:#FF7B72">in</span><span style="color:#E6EDF3"> packets:</span></span>
+<span class="line"><span style="color:#FF7B72">    if</span><span style="color:#E6EDF3"> packet.haslayer(</span><span style="color:#79C0FF">ICMP</span><span style="color:#E6EDF3">) </span><span style="color:#FF7B72">and</span><span style="color:#E6EDF3"> packet.haslayer(Raw) </span><span style="color:#FF7B72">and</span><span style="color:#E6EDF3"> packet.getlayer(</span><span style="color:#79C0FF">IP</span><span style="color:#E6EDF3">).src </span><span style="color:#FF7B72">==</span><span style="color:#A5D6FF"> "192.168.56.1"</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#E6EDF3">        out </span><span style="color:#FF7B72">+=</span><span style="color:#E6EDF3"> packet.getlayer(Raw).load[</span><span style="color:#79C0FF">16</span><span style="color:#E6EDF3">:</span><span style="color:#79C0FF">32</span><span style="color:#E6EDF3">]</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">starts </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> [m.start() </span><span style="color:#FF7B72">for</span><span style="color:#E6EDF3"> m </span><span style="color:#FF7B72">in</span><span style="color:#E6EDF3"> re.finditer(</span><span style="color:#FF7B72">b</span><span style="color:#A5D6FF">'</span><span style="color:#FF7B72">\x89\x50\x4e\x47\x0d\x0a\x1a\x0a</span><span style="color:#A5D6FF">'</span><span style="color:#E6EDF3">, out)]</span></span>
+<span class="line"><span style="color:#E6EDF3">ends </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> [m.end() </span><span style="color:#FF7B72">for</span><span style="color:#E6EDF3"> m </span><span style="color:#FF7B72">in</span><span style="color:#E6EDF3"> re.finditer(</span><span style="color:#FF7B72">b</span><span style="color:#A5D6FF">'</span><span style="color:#FF7B72">\x49\x45\x4e\x44\xae\x42\x60\x82</span><span style="color:#A5D6FF">'</span><span style="color:#E6EDF3">, out)]</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">for</span><span style="color:#E6EDF3"> i </span><span style="color:#FF7B72">in</span><span style="color:#79C0FF"> range</span><span style="color:#E6EDF3">(</span><span style="color:#79C0FF">len</span><span style="color:#E6EDF3">(starts)):</span></span>
+<span class="line"><span style="color:#FFA657">    file</span><span style="color:#FF7B72"> =</span><span style="color:#E6EDF3"> out[starts[i]:ends[i]]</span></span>
+<span class="line"><span style="color:#FF7B72">    with</span><span style="color:#79C0FF"> open</span><span style="color:#E6EDF3">(</span><span style="color:#FF7B72">f</span><span style="color:#A5D6FF">"dumps/</span><span style="color:#FF7B72">{</span><span style="color:#E6EDF3">i</span><span style="color:#FF7B72">}</span><span style="color:#A5D6FF">.png"</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"wb"</span><span style="color:#E6EDF3">) </span><span style="color:#FF7B72">as</span><span style="color:#E6EDF3"> f:</span></span>
+<span class="line"><span style="color:#E6EDF3">        f.write(</span><span style="color:#FFA657">file</span><span style="color:#E6EDF3">)</span></span></code></pre>
+<p><img src="/images/101_forensics/101_forensics_2.png" alt=""></p></div></article><aside class="toc" aria-label="On this page"><p>On this page</p><ol><li class="nested"><a href="#challenge-description">Challenge Description</a></li><li class="nested"><a href="#flag">Flag</a></li><li class="nested"><a href="#analysis">Analysis</a></li><li class="nested"><a href="#solution">Solution</a></li></ol></aside></main><footer class="site-footer"><div><span>k3ng.xyz</span><span class="footer-note">2026</span></div></footer><script>
+      document.querySelector('.theme-toggle')?.addEventListener('click', () => {
+        const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+        const updateTheme = () => {
+          document.documentElement.dataset.theme = theme;
+          localStorage.setItem('theme', theme);
+        };
+
+        if (document.startViewTransition) {
+          document.startViewTransition(updateTheme);
+          return;
+        }
+
+        document.documentElement.classList.add('theme-transition');
+        updateTheme();
+        setTimeout(() => document.documentElement.classList.remove('theme-transition'), 650);
+      });
+    </script></body></html>

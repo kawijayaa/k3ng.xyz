@@ -1,0 +1,22 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="Things I write about CTFs, forensics, and cyber security."><meta name="generator" content="Astro v7.1.1"><meta property="og:title" content="Blog | k3ng.xyz"><meta property="og:description" content="Things I write about CTFs, forensics, and cyber security."><meta property="og:type" content="website"><link rel="icon" type="image/jpeg" href="/favicon.jpg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"><title>Blog | k3ng.xyz</title><script>
+      const savedTheme = localStorage.getItem('theme');
+      const preferredTheme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.dataset.theme = savedTheme || preferredTheme;
+    </script><link rel="stylesheet" href="/_astro/BaseLayout.DZwBvaeU.css"></head><body><header class="site-header"><div class="header-inner"><a class="wordmark" href="/" aria-label="Home">k3ng</a><nav aria-label="Primary navigation"><a href="/blog" aria-current="page">Blog</a><a href="/writeups">Writeups</a><a href="/about">About</a></nav><button class="theme-toggle" type="button" aria-label="Toggle color theme"><span class="theme-light" aria-hidden="true">☼</span><span class="theme-dark" aria-hidden="true">☾</span></button></div></header><main class="listing-page"><header class="page-header"><p class="eyebrow">The yap section</p><h1>Blog</h1><p>The section where I talk about things digital forensics, cyber security and beyond.</p></header><div class="blog-grid"><a class="blog-card" href="/blog/project-victoria"><div class="card-image"><img src="/images/project_victoria/project_victoria_2.png" alt="" loading="lazy"></div><div class="card-body"><time datetime="2026-07-01T00:00:00.000Z">Jul 1, 2026</time><h2>Project Victoria Incident Report</h2><p>An incident report based on the Project Victoria case from the SOCSIM course.</p><span class="card-link">Read article <span aria-hidden="true">→</span></span></div></a><a class="blog-card" href="/blog/ctf-is-dead"><div class="card-image"><img src="/images/ctf_is_dead/ctf-is-dead-thumbnail.jpg" alt="" loading="lazy"></div><div class="card-body"><time datetime="2026-03-19T00:00:00.000Z">Mar 19, 2026</time><h2>CTF is dead*</h2><p>Capture-the-flag (CTF) competitions has been the biggest part of my journey in cyber security, and probably is the case for most people beginning their journey in cyber security. But I&#39;m struggling to see a bright future for CTF&#39;s in its current state.</p><span class="card-link">Read article <span aria-hidden="true">→</span></span></div></a><a class="blog-card" href="/blog/cloudflare-phishing-campaign"><div class="card-image"><img src="/images/cloudflare_phishing/cloudflare_phishing_thumbnail.jpg" alt="" loading="lazy"></div><div class="card-body"><time datetime="2025-11-14T00:00:00.000Z">Nov 14, 2025</time><h2>Analysing a Multi-Stage Malware From a Cloudflare Verification Phishing Campaign</h2><span class="card-link">Read article <span aria-hidden="true">→</span></span></div></a></div></main><footer class="site-footer"><div><span>k3ng.xyz</span><span class="footer-note">2026</span></div></footer><script>
+      document.querySelector('.theme-toggle')?.addEventListener('click', () => {
+        const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+        const updateTheme = () => {
+          document.documentElement.dataset.theme = theme;
+          localStorage.setItem('theme', theme);
+        };
+
+        if (document.startViewTransition) {
+          document.startViewTransition(updateTheme);
+          return;
+        }
+
+        document.documentElement.classList.add('theme-transition');
+        updateTheme();
+        setTimeout(() => document.documentElement.classList.remove('theme-transition'), 650);
+      });
+    </script></body></html>

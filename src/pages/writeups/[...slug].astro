@@ -1,0 +1,48 @@
+---
+import { getCollection, render } from 'astro:content';
+import ArticleLayout from '../../layouts/ArticleLayout.astro';
+import WriteupList from '../../components/WriteupList.astro';
+import { cleanId } from '../../lib/content';
+
+export async function getStaticPaths() {
+  return (await getCollection('writeups'))
+    .filter((entry) => cleanId(entry.id) !== 'index')
+    .map((entry) => {
+      const id = cleanId(entry.id);
+      return {
+        params: { slug: id.replace(/\/index$/, '') },
+        props: { entry },
+      };
+    });
+}
+
+const { entry } = Astro.props;
+const all = await getCollection('writeups');
+const id = cleanId(entry.id);
+const isCompetition = id.endsWith('/index');
+const parent = id.replace(/\/index$/, '');
+const children = all.filter((item) => {
+  const childId = cleanId(item.id);
+  return item.data.icon && childId.startsWith(`${parent}/`) && childId.split('/').length === parent.split('/').length + 1;
+});
+const competitions = all.filter((item) => cleanId(item.id).endsWith('/index'));
+const competition = competitions.find((item) => id.startsWith(cleanId(item.id).replace(/\/index$/, '')));
+const { Content, headings } = await render(entry);
+---
+
+<ArticleLayout
+  title={entry.data.title}
+  eyebrow={isCompetition ? 'Competition' : competition?.data.title ?? 'Writeup'}
+  date={isCompetition ? entry.data.date : undefined}
+  endDate={isCompetition ? entry.data.endDate : undefined}
+  headings={headings}
+  tags={entry.data.tags}
+>
+  <Content />
+  {isCompetition && children.length > 0 && (
+    <section class="challenge-list">
+      <h2>Challenges</h2>
+      <WriteupList entries={children} competitions={competitions} />
+    </section>
+  )}
+</ArticleLayout>
