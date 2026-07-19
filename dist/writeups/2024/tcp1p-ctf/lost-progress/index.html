@@ -1,0 +1,48 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="CTF writeups, digital forensics, and cyber security notes by k3ng."><meta name="generator" content="Astro v7.1.1"><meta property="og:title" content="Lost Progress | k3ng.xyz"><meta property="og:description" content="CTF writeups, digital forensics, and cyber security notes by k3ng."><meta property="og:type" content="website"><link rel="icon" type="image/jpeg" href="/favicon.jpg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"><title>Lost Progress | k3ng.xyz</title><script>
+      const savedTheme = localStorage.getItem('theme');
+      const preferredTheme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.dataset.theme = savedTheme || preferredTheme;
+    </script><link rel="stylesheet" href="/_astro/BaseLayout.DZwBvaeU.css"></head><body><header class="site-header"><div class="header-inner"><a class="wordmark" href="/" aria-label="Home">k3ng</a><nav aria-label="Primary navigation"><a href="/blog">Blog</a><a href="/writeups" aria-current="page">Writeups</a><a href="/about">About</a></nav><button class="theme-toggle" type="button" aria-label="Toggle color theme"><span class="theme-light" aria-hidden="true">☼</span><span class="theme-dark" aria-hidden="true">☾</span></button></div></header><main class="article-shell has-toc"><article><header class="article-header"><p class="eyebrow">TCP1P CTF 2024</p><h1>Lost Progress</h1><ul class="article-tags" aria-label="Article tags"><li>memory-forensics</li><li>volatility</li><li>process-memory</li><li>gimp</li><li>raw-image-recovery</li></ul></header><div class="prose"><h3 id="challenge-description">Challenge Description</h3>
+<p>My friend Andi just crashed his computer and all the progress he made are gone. It was 2 of his secret passwords with each of them being inside an image and a text file. Luckily he has an automatic RAM capture program incase something like this happen, but no idea on how to use it…</p>
+<h3 id="flag">Flag</h3>
+<p><code>TCP1P{wIeRRRMQqykX6zs3O7KSQY6Xq6z4TKnr_ekxyAH2jIrh0Opyu432tk9y0KdiujkMu}</code></p>
+<hr>
+<h3 id="analysis-and-solution">Analysis and Solution</h3>
+<p>We are given a memory dump from a Windows system. From the description, we are supposed to recover passwords from an image and a text file. Let’s do some more reconnaissance first by see what processes are running.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>❯ vol.py -f dumped windows.pslist</span></span>
+<span class="line"><span>Volatility 3 Framework 2.11.0</span></span>
+<span class="line"><span>Progress:  100.00               PDB scanning finished</span></span>
+<span class="line"><span>PID     PPID    ImageFileName   Offset(V)       Threads Handles SessionId       Wow64   CreateTime      ExitTime        File output</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>(cut for brevity)</span></span>
+<span class="line"><span>348     776     Code.exe        0xe38d0c591080  0       -       1       False   2024-10-03 10:12:24.000000 UTC  2024-10-03 13:42:14.000000 UTC  Disabled</span></span>
+<span class="line"><span>1716    348     Code.exe        0xe38d0d60d080  0       -       1       False   2024-10-03 10:12:31.000000 UTC  2024-10-03 13:42:14.000000 UTC  Disabled</span></span>
+<span class="line"><span>(cut for brevity)</span></span>
+<span class="line"><span>5584    3556    notepad.exe     0xe38d10685240  4       -       1       False   2024-10-03 13:41:33.000000 UTC  N/A     Disabled</span></span>
+<span class="line"><span>(cut for brevity)</span></span>
+<span class="line"><span>5380    3556    gimp-2.10.exe   0xe38d0becf080  11      -       1       False   2024-10-03 15:34:51.000000 UTC  N/A     Disabled</span></span>
+<span class="line"><span>(cut for brevity)</span></span></code></pre>
+<p>From the Volatility3 output, we could see some candidates of the processes that could store the passwords. Let’s try to dump the GIMP process first to find the passwords.</p>
+<p><code>❯ vol.py -f dumped windows.memmap --dump --pid 5380</code></p>
+<p>After dumping the process and changing the extension to <code>.data</code>, we can open the file with GIMP to see the image that is opened on the dumped GIMP process. </p>
+<p>After tinkering with the offset, width and height, we find the password that is inside the image.</p>
+<p><img src="/images/lost_progress/lost_progress_1.png" alt=""></p>
+<p>By tinkering with the offset, width and height (again), we also find the password that is inside the text file.</p>
+<p><img src="/images/lost_progress/lost_progress_2.png" alt=""></p></div></article><aside class="toc" aria-label="On this page"><p>On this page</p><ol><li class="nested"><a href="#challenge-description">Challenge Description</a></li><li class="nested"><a href="#flag">Flag</a></li><li class="nested"><a href="#analysis-and-solution">Analysis and Solution</a></li></ol></aside></main><footer class="site-footer"><div><span>k3ng.xyz</span><span class="footer-note">2026</span></div></footer><script>
+      document.querySelector('.theme-toggle')?.addEventListener('click', () => {
+        const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+        const updateTheme = () => {
+          document.documentElement.dataset.theme = theme;
+          localStorage.setItem('theme', theme);
+        };
+
+        if (document.startViewTransition) {
+          document.startViewTransition(updateTheme);
+          return;
+        }
+
+        document.documentElement.classList.add('theme-transition');
+        updateTheme();
+        setTimeout(() => document.documentElement.classList.remove('theme-transition'), 650);
+      });
+    </script></body></html>

@@ -1,0 +1,57 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="CTF writeups, digital forensics, and cyber security notes by k3ng."><meta name="generator" content="Astro v7.1.1"><meta property="og:title" content="doxxed | k3ng.xyz"><meta property="og:description" content="CTF writeups, digital forensics, and cyber security notes by k3ng."><meta property="og:type" content="website"><link rel="icon" type="image/jpeg" href="/favicon.jpg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"><title>doxxed | k3ng.xyz</title><script>
+      const savedTheme = localStorage.getItem('theme');
+      const preferredTheme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.dataset.theme = savedTheme || preferredTheme;
+    </script><link rel="stylesheet" href="/_astro/BaseLayout.DZwBvaeU.css"></head><body><header class="site-header"><div class="header-inner"><a class="wordmark" href="/" aria-label="Home">k3ng</a><nav aria-label="Primary navigation"><a href="/blog">Blog</a><a href="/writeups" aria-current="page">Writeups</a><a href="/about">About</a></nav><button class="theme-toggle" type="button" aria-label="Toggle color theme"><span class="theme-light" aria-hidden="true">☼</span><span class="theme-dark" aria-hidden="true">☾</span></button></div></header><main class="article-shell has-toc"><article><header class="article-header"><p class="eyebrow">TCP1P CTF 2024</p><h1>doxxed</h1><ul class="article-tags" aria-label="Article tags"><li>git</li><li>github</li><li>commit-recovery</li><li>docker-layers</li><li>ghidra</li></ul></header><div class="prose"><h3 id="challenge-description">Challenge Description</h3>
+<p>I recently forked a public repository on GitHub. After a few days I deleted my repo. However, my friend informed me that he are still able to access one of my commits from that fork which commit 4bxxxxx. Can you figure out how this happened? See the public repo below.</p>
+<h3 id="flag">Flag</h3>
+<p><code>TCP1P{83fe034b2cfb09deafbb955b03392a083d8f83b2}</code></p>
+<hr>
+<h3 id="analysis-and-solution">Analysis and Solution</h3>
+<p>We are given a <code>.zip</code> file containing a git repository. From the description, we are supposed to find a commit from a deleted fork. First, we need to find the GitHub URL for this repository. We could find that information from the <code>.git/config</code> file.</p>
+<p><img src="/images/doxxed/doxxed_1.png" alt=""></p>
+<p>From this file, we can conclude that the <code>origin</code> is pointing to <code>git@github.com:notevilcorp/tools.git</code>. This is equivalent to the GitHub URL of <code>https://github.com/notevilcorp/tools</code>.</p>
+<p>Based on this <a href="https://trufflesecurity.com/blog/anyone-can-access-deleted-and-private-repo-data-github">blog</a>, we can conclude that the commit from the deleted fork is still stored by GitHub. By supplying the commit hash, we could access said commit. But, we are only supplied with the first two characters of the commit hash.</p>
+<p>Based on this Git documentation, Git could identify a commit with only the first four characters of the commit hash, given that there is only one commit hash that starts with that four characters. This means we could brute-force the hash to get the commit.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#8B949E"># bruteforce.py</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">from</span><span style="color:#E6EDF3"> itertools </span><span style="color:#FF7B72">import</span><span style="color:#E6EDF3"> permutations</span></span>
+<span class="line"><span style="color:#FF7B72">import</span><span style="color:#E6EDF3"> requests</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">for</span><span style="color:#E6EDF3"> a </span><span style="color:#FF7B72">in</span><span style="color:#A5D6FF"> '0123456789abcdef'</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#E6EDF3">    lastsha </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> permutations(</span><span style="color:#A5D6FF">'0123456789abcdef'</span><span style="color:#E6EDF3">, </span><span style="color:#79C0FF">1</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#FF7B72">    for</span><span style="color:#E6EDF3"> _ </span><span style="color:#FF7B72">in</span><span style="color:#E6EDF3"> lastsha:</span></span>
+<span class="line"><span style="color:#E6EDF3">        sha </span><span style="color:#FF7B72">=</span><span style="color:#A5D6FF"> '4b'</span><span style="color:#FF7B72"> +</span><span style="color:#E6EDF3"> a </span><span style="color:#FF7B72">+</span><span style="color:#E6EDF3"> _[</span><span style="color:#79C0FF">0</span><span style="color:#E6EDF3">]</span></span>
+<span class="line"><span style="color:#E6EDF3">        res </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> requests.get(</span><span style="color:#A5D6FF">'https://github.com/notevilcorp/tools/commit/'</span><span style="color:#FF7B72"> +</span><span style="color:#E6EDF3"> sha)</span></span>
+<span class="line"><span style="color:#FF7B72">        if</span><span style="color:#E6EDF3"> res.status_code </span><span style="color:#FF7B72">!=</span><span style="color:#79C0FF"> 404</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#79C0FF">            print</span><span style="color:#E6EDF3">(sha)</span></span>
+<span class="line"><span style="color:#79C0FF">            exit</span><span style="color:#E6EDF3">()</span></span></code></pre>
+<p>After we use this script, we got a commit hash of <code>4b15</code>. Therefore we need to go to <code>https://github.com/notevilcorp/tools/commit/4b15</code> to access the commit from the deleted fork.</p>
+<p><img src="/images/doxxed/doxxed_2.png" alt=""></p>
+<p>Looking at the diff of this commit, this commit adds a file called <code>start.sh</code> containing a command to run a Docker container from the <code>53buahapel/sup3rsecretools:dev</code> image. Let’s look at this docker image on the Docker Hub.</p>
+<p><img src="/images/doxxed/doxxed_3.png" alt=""></p>
+<p>Based on the layers in this image, we can see that there is an <code>exec</code> file that is replacing the default <code>exec</code> executable. Let’s extract that file to look into it further. To do that, we could extract the image by using the <code>docker save</code> command and saving the result to a <code>.tar</code> file.</p>
+<p><img src="/images/doxxed/doxxed_4.png" alt=""></p>
+<p>After looking around, the <code>exec</code> executable that we are looking for is on <code>3ef0ed19552377195b1dddad9b036de38fc2ff4a86ce921016edaae42e00a8d1/layer.tar</code>. </p>
+<p><img src="/images/doxxed/doxxed_5.png" alt=""></p>
+<p>Since this is an executable, let’s reverse engineer it using Ghidra.</p>
+<p><img src="/images/doxxed/doxxed_6.png" alt=""></p>
+<p>From the decompilation, we could see that this executable will do a cURL request to <code>https://asciified.thelicato.io/api/v2/ascii?text=</code> and supplying a Base64 string as the <code>text</code> query parameter. Decoding the Base64 string will get us the flag.</p>
+<p><img src="/images/doxxed/doxxed_7.png" alt=""></p></div></article><aside class="toc" aria-label="On this page"><p>On this page</p><ol><li class="nested"><a href="#challenge-description">Challenge Description</a></li><li class="nested"><a href="#flag">Flag</a></li><li class="nested"><a href="#analysis-and-solution">Analysis and Solution</a></li></ol></aside></main><footer class="site-footer"><div><span>k3ng.xyz</span><span class="footer-note">2026</span></div></footer><script>
+      document.querySelector('.theme-toggle')?.addEventListener('click', () => {
+        const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+        const updateTheme = () => {
+          document.documentElement.dataset.theme = theme;
+          localStorage.setItem('theme', theme);
+        };
+
+        if (document.startViewTransition) {
+          document.startViewTransition(updateTheme);
+          return;
+        }
+
+        document.documentElement.classList.add('theme-transition');
+        updateTheme();
+        setTimeout(() => document.documentElement.classList.remove('theme-transition'), 650);
+      });
+    </script></body></html>

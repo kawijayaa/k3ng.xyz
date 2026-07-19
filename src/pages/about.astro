@@ -1,0 +1,12 @@
+---
+import { getCollection, render } from 'astro:content';
+import ArticleLayout from '../layouts/ArticleLayout.astro';
+
+const entry = (await getCollection('pages')).find((item) => item.id.replace(/\.md$/, '') === 'about');
+if (!entry) throw new Error('Missing content/pages/about.md');
+const { Content, headings } = await render(entry);
+---
+
+<ArticleLayout title={entry.data.title} description={entry.data.description} eyebrow="G'day!" headings={headings} tableOfContents={false}>
+  <Content />
+</ArticleLayout>

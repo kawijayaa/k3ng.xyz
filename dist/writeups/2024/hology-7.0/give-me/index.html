@@ -1,0 +1,128 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="CTF writeups, digital forensics, and cyber security notes by k3ng."><meta name="generator" content="Astro v7.1.1"><meta property="og:title" content="give me | k3ng.xyz"><meta property="og:description" content="CTF writeups, digital forensics, and cyber security notes by k3ng."><meta property="og:type" content="website"><link rel="icon" type="image/jpeg" href="/favicon.jpg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"><title>give me | k3ng.xyz</title><script>
+      const savedTheme = localStorage.getItem('theme');
+      const preferredTheme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.dataset.theme = savedTheme || preferredTheme;
+    </script><link rel="stylesheet" href="/_astro/BaseLayout.DZwBvaeU.css"></head><body><header class="site-header"><div class="header-inner"><a class="wordmark" href="/" aria-label="Home">k3ng</a><nav aria-label="Primary navigation"><a href="/blog">Blog</a><a href="/writeups" aria-current="page">Writeups</a><a href="/about">About</a></nav><button class="theme-toggle" type="button" aria-label="Toggle color theme"><span class="theme-light" aria-hidden="true">☼</span><span class="theme-dark" aria-hidden="true">☾</span></button></div></header><main class="article-shell has-toc"><article><header class="article-header"><p class="eyebrow">CTF Hology 7.0</p><h1>give me</h1><ul class="article-tags" aria-label="Article tags"><li>buffer-overflow</li><li>stack-variable-overwrite</li><li>ghidra</li><li>pwntools</li></ul></header><div class="prose"><h3 id="challenge-description">Challenge Description</h3>
+<p>Author : anakmamah</p>
+<p>Maafkan soal yang gampang ini 🙏🏻, probset nya skill issue</p>
+<h3 id="flag">Flag</h3>
+<p><code>HOLOGY7{1ts_4lw4ys_0v3rfl0w_Vu1n_h3R3}</code></p>
+<hr>
+<h3 id="analysis-and-solution">Analysis and Solution</h3>
+<p>We are given an executable, so we need to decompile it using Ghidra. From the decompilation results, we are given a menu application where we can register, login, view profile, logout and exit.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="c"><code><span class="line"><span style="color:#8B949E">  // snip</span></span>
+<span class="line"><span style="color:#FF7B72">  do</span><span style="color:#E6EDF3"> {</span></span>
+<span class="line"><span style="color:#FF7B72">    while</span><span style="color:#E6EDF3">( </span><span style="color:#79C0FF">true</span><span style="color:#E6EDF3"> ) {</span></span>
+<span class="line"><span style="color:#D2A8FF">      puts</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"</span><span style="color:#FF7B72">\n</span><span style="color:#A5D6FF">--- Menu ---"</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#D2A8FF">      puts</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"1. Register"</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#D2A8FF">      puts</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"2. Login"</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#D2A8FF">      puts</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"3. View Profile"</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#D2A8FF">      puts</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"4. Logout"</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#D2A8FF">      puts</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"5. Exit"</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#D2A8FF">      printf</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"Choose an option: "</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#D2A8FF">      __isoc99_scanf</span><span style="color:#E6EDF3">(</span><span style="color:#FF7B72">&#x26;</span><span style="color:#E6EDF3">DAT_00102327,</span><span style="color:#FF7B72">&#x26;</span><span style="color:#E6EDF3">local_38);</span></span>
+<span class="line"><span style="color:#D2A8FF">      getchar</span><span style="color:#E6EDF3">();</span></span>
+<span class="line"><span style="color:#FF7B72">      if</span><span style="color:#E6EDF3"> (local_38 </span><span style="color:#FF7B72">&#x3C;</span><span style="color:#79C0FF"> 6</span><span style="color:#E6EDF3">) </span><span style="color:#FF7B72">break</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#FF7B72">      if</span><span style="color:#E6EDF3"> (local_38 </span><span style="color:#FF7B72">==</span><span style="color:#79C0FF"> 69</span><span style="color:#E6EDF3">) {</span></span>
+<span class="line"><span style="color:#D2A8FF">        add_credits</span><span style="color:#E6EDF3">(</span><span style="color:#FF7B72">&#x26;</span><span style="color:#E6EDF3">local_30,local_34);</span></span>
+<span class="line"><span style="color:#E6EDF3">      }</span></span>
+<span class="line"><span style="color:#FF7B72">      else</span><span style="color:#E6EDF3"> {</span></span>
+<span class="line"><span style="color:#E6EDF3">switchD_001016e4_caseD_5:</span></span>
+<span class="line"><span style="color:#D2A8FF">        puts</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"Invalid choice. Try again."</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#E6EDF3">      }</span></span>
+<span class="line"><span style="color:#E6EDF3">    }</span></span>
+<span class="line"><span style="color:#8B949E">    // snip</span></span></code></pre>
+<p>From the <code>login</code> function, we can see a <code>gets</code> function called to get the password. Which means this function is vulnerable to a buffer overflow attack. From the code flow, we can infer if our username is <code>A</code> and our password is <code>s3cr3tpass</code> and our <code>local_c</code> value is <code>yek</code>, then we can access a new feature to add credits.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="c"><code><span class="line"><span style="color:#FF7B72">void</span><span style="color:#D2A8FF"> login</span><span style="color:#E6EDF3">(</span><span style="color:#FF7B72">char</span><span style="color:#FF7B72"> *</span><span style="color:#FFA657">param_1</span><span style="color:#E6EDF3">,undefined4 </span><span style="color:#FF7B72">*</span><span style="color:#FFA657">param_2</span><span style="color:#E6EDF3">,undefined4 </span><span style="color:#FF7B72">*</span><span style="color:#FFA657">param_3</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">{</span></span>
+<span class="line"><span style="color:#FF7B72">  int</span><span style="color:#E6EDF3"> iVar1;</span></span>
+<span class="line"><span style="color:#FF7B72">  char</span><span style="color:#E6EDF3"> local_38 [</span><span style="color:#79C0FF">44</span><span style="color:#E6EDF3">];</span></span>
+<span class="line"><span style="color:#FF7B72">  uint</span><span style="color:#E6EDF3"> local_c;</span></span>
+<span class="line"><span style="color:#E6EDF3">  </span></span>
+<span class="line"><span style="color:#E6EDF3">  local_c </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> 0</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#D2A8FF">  puts</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"Enter your username: "</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#D2A8FF">  fgets</span><span style="color:#E6EDF3">(param_1,</span><span style="color:#79C0FF">8</span><span style="color:#E6EDF3">,stdin);</span></span>
+<span class="line"><span style="color:#D2A8FF">  puts</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"Enter your password: "</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#D2A8FF">  gets</span><span style="color:#E6EDF3">(local_38);</span></span>
+<span class="line"><span style="color:#D2A8FF">  printf</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"You entered: </span><span style="color:#FF7B72">%s\n</span><span style="color:#A5D6FF">"</span><span style="color:#E6EDF3">,local_38);</span></span>
+<span class="line"><span style="color:#D2A8FF">  printf</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"Your status is: </span><span style="color:#FF7B72">%d\n</span><span style="color:#A5D6FF">"</span><span style="color:#E6EDF3">,(ulong)local_c);</span></span>
+<span class="line"><span style="color:#E6EDF3">  iVar1 </span><span style="color:#FF7B72">=</span><span style="color:#D2A8FF"> strcmp</span><span style="color:#E6EDF3">(local_38,</span><span style="color:#A5D6FF">"s3cr3tpass"</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#FF7B72">  if</span><span style="color:#E6EDF3"> (iVar1 </span><span style="color:#FF7B72">==</span><span style="color:#79C0FF"> 0</span><span style="color:#E6EDF3">) {</span></span>
+<span class="line"><span style="color:#D2A8FF">    puts</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"Login successful!"</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#FF7B72">    *</span><span style="color:#E6EDF3">param_2 </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> 1</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#FF7B72">    if</span><span style="color:#E6EDF3"> ((local_c </span><span style="color:#FF7B72">==</span><span style="color:#FF7B72"> 0x</span><span style="color:#79C0FF">79656b</span><span style="color:#E6EDF3">) </span><span style="color:#FF7B72">&#x26;&#x26;</span><span style="color:#E6EDF3"> (</span><span style="color:#FF7B72">*</span><span style="color:#E6EDF3">param_1 </span><span style="color:#FF7B72">==</span><span style="color:#A5D6FF"> 'A'</span><span style="color:#E6EDF3">)) {</span></span>
+<span class="line"><span style="color:#FF7B72">      *</span><span style="color:#E6EDF3">param_3 </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> 1</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#D2A8FF">      puts</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"Feature unlocked: You can now add credits!"</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#E6EDF3">    }</span></span>
+<span class="line"><span style="color:#FF7B72">    else</span><span style="color:#E6EDF3"> {</span></span>
+<span class="line"><span style="color:#D2A8FF">      puts</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"Feature locked: You cannot add credits yet."</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#E6EDF3">    }</span></span>
+<span class="line"><span style="color:#FF7B72">    return</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#E6EDF3">  }</span></span>
+<span class="line"><span style="color:#D2A8FF">  puts</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"Invalid password. Try again."</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#8B949E">                    /* WARNING: Subroutine does not return */</span></span>
+<span class="line"><span style="color:#D2A8FF">  exit</span><span style="color:#E6EDF3">(</span><span style="color:#79C0FF">1</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#E6EDF3">}</span></span></code></pre>
+<p>Since the program does not change the <code>local_c</code> variable, we need to leverage a buffer overflow to overwrite the <code>local_c</code> variable. To do that, we need to put in <code>s3cr3tpass</code>  where this is the value we need to have to pass the <code>strcmp</code> check. Then we need to concatenate 34 null bytes, where 34 is the array size of <code>local_38</code> subtracted by the length of <code>s3cr3tpass</code>. The null bytes acts as the string termination character while also filling up our buffer. Then we need to concatenate <code>yek</code> to pass the <code>local_c</code> check. But since the payload will be interpreted using little-endian, we will concatenate <code>key</code> instead.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#8B949E"># Password Payload</span></span>
+<span class="line"><span style="color:#FF7B72">b</span><span style="color:#A5D6FF">"s3cr3tpass"</span><span style="color:#FF7B72"> +</span><span style="color:#FF7B72"> b</span><span style="color:#A5D6FF">"</span><span style="color:#FF7B72">\x00</span><span style="color:#A5D6FF">"</span><span style="color:#FF7B72">*</span><span style="color:#79C0FF">34</span><span style="color:#FF7B72">+</span><span style="color:#FF7B72"> b</span><span style="color:#A5D6FF">"key"</span></span></code></pre>
+<p>After entering the username and password, we should be allowed to access the new feature. From the menu code, we can access the <code>add_credits</code> function by entering <code>69</code> as the option on the menu (nice).</p>
+<p>From the <code>add_credits</code> code, we need to input the value of <code>calculate_value()</code> to get to the <code>congrats()</code> function. The value of <code>calculate_value()</code> is simply <code>3735991189</code>. After entering the value, the <code>congrats()</code> function will return our flag.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="c"><code><span class="line"><span style="color:#FF7B72">void</span><span style="color:#D2A8FF"> add_credits</span><span style="color:#E6EDF3">(</span><span style="color:#FF7B72">uint</span><span style="color:#FF7B72"> *</span><span style="color:#FFA657">param_1</span><span style="color:#E6EDF3">,</span><span style="color:#FF7B72">int</span><span style="color:#FFA657"> param_2</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">{</span></span>
+<span class="line"><span style="color:#FF7B72">  int</span><span style="color:#E6EDF3"> local_10;</span></span>
+<span class="line"><span style="color:#FF7B72">  uint</span><span style="color:#E6EDF3"> local_c;</span></span>
+<span class="line"><span style="color:#E6EDF3">  </span></span>
+<span class="line"><span style="color:#FF7B72">  if</span><span style="color:#E6EDF3"> (param_2 </span><span style="color:#FF7B72">==</span><span style="color:#79C0FF"> 0</span><span style="color:#E6EDF3">) {</span></span>
+<span class="line"><span style="color:#D2A8FF">    puts</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"Access denied! You need to unlock this feature first."</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#E6EDF3">  }</span></span>
+<span class="line"><span style="color:#FF7B72">  else</span><span style="color:#E6EDF3"> {</span></span>
+<span class="line"><span style="color:#D2A8FF">    puts</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"Wow, how did u find me :O"</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#D2A8FF">    printf</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"Enter the amount of credits to add: "</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#D2A8FF">    __isoc99_scanf</span><span style="color:#E6EDF3">(</span><span style="color:#FF7B72">&#x26;</span><span style="color:#E6EDF3">DAT_0010225d,</span><span style="color:#FF7B72">&#x26;</span><span style="color:#E6EDF3">local_10);</span></span>
+<span class="line"><span style="color:#FF7B72">    *</span><span style="color:#E6EDF3">param_1 </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> local_10 </span><span style="color:#FF7B72">+</span><span style="color:#FF7B72"> *</span><span style="color:#E6EDF3">param_1;</span></span>
+<span class="line"><span style="color:#D2A8FF">    printf</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"Credits added! Total credits: </span><span style="color:#FF7B72">%d\n</span><span style="color:#A5D6FF">"</span><span style="color:#E6EDF3">,(ulong)</span><span style="color:#FF7B72">*</span><span style="color:#E6EDF3">param_1);</span></span>
+<span class="line"><span style="color:#E6EDF3">    local_c </span><span style="color:#FF7B72">=</span><span style="color:#D2A8FF"> calculate_value</span><span style="color:#E6EDF3">();</span></span>
+<span class="line"><span style="color:#FF7B72">    if</span><span style="color:#E6EDF3"> (local_c </span><span style="color:#FF7B72">==</span><span style="color:#FF7B72"> *</span><span style="color:#E6EDF3">param_1) {</span></span>
+<span class="line"><span style="color:#D2A8FF">      puts</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">" Accessing secret..."</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#D2A8FF">      congrats</span><span style="color:#E6EDF3">();</span></span>
+<span class="line"><span style="color:#E6EDF3">    }</span></span>
+<span class="line"><span style="color:#E6EDF3">  }</span></span>
+<span class="line"><span style="color:#FF7B72">  return</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#E6EDF3">}</span></span></code></pre>
+<h3 id="solver-script">Solver Script</h3>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#FF7B72">from</span><span style="color:#E6EDF3"> pwn </span><span style="color:#FF7B72">import</span><span style="color:#FF7B72"> *</span></span>
+<span class="line"><span style="color:#FF7B72">import</span><span style="color:#E6EDF3"> re</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">r </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> remote(</span><span style="color:#A5D6FF">'103.175.221.20'</span><span style="color:#E6EDF3">, </span><span style="color:#79C0FF">3333</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">r.recvuntil(</span><span style="color:#FF7B72">b</span><span style="color:#A5D6FF">"option: "</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">r.sendline(</span><span style="color:#FF7B72">b</span><span style="color:#A5D6FF">"2"</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">r.recvuntil(</span><span style="color:#FF7B72">b</span><span style="color:#A5D6FF">"username: </span><span style="color:#FF7B72">\r\n</span><span style="color:#A5D6FF">"</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">r.sendline(</span><span style="color:#FF7B72">b</span><span style="color:#A5D6FF">"A"</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">r.recvuntil(</span><span style="color:#FF7B72">b</span><span style="color:#A5D6FF">"password: </span><span style="color:#FF7B72">\r\n</span><span style="color:#A5D6FF">"</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">r.sendline(</span><span style="color:#FF7B72">b</span><span style="color:#A5D6FF">"s3cr3tpass"</span><span style="color:#FF7B72">+</span><span style="color:#FF7B72">b</span><span style="color:#A5D6FF">"</span><span style="color:#FF7B72">\x00</span><span style="color:#A5D6FF">"</span><span style="color:#FF7B72">*</span><span style="color:#79C0FF">34</span><span style="color:#FF7B72">+</span><span style="color:#FF7B72">b</span><span style="color:#A5D6FF">"key"</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">r.recvuntil(</span><span style="color:#FF7B72">b</span><span style="color:#A5D6FF">"option: "</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">r.sendline(</span><span style="color:#FF7B72">b</span><span style="color:#A5D6FF">"69"</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">r.recvuntil(</span><span style="color:#FF7B72">b</span><span style="color:#A5D6FF">"add: "</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">r.sendline(</span><span style="color:#FF7B72">b</span><span style="color:#A5D6FF">"3735991189"</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79C0FF">print</span><span style="color:#E6EDF3">(re.findall(</span><span style="color:#FF7B72">r</span><span style="color:#A5D6FF">"HOLOGY7{</span><span style="color:#79C0FF">.</span><span style="color:#FF7B72">*</span><span style="color:#A5D6FF">}"</span><span style="color:#E6EDF3">, r.recv().decode())[</span><span style="color:#79C0FF">0</span><span style="color:#E6EDF3">])</span></span></code></pre></div></article><aside class="toc" aria-label="On this page"><p>On this page</p><ol><li class="nested"><a href="#challenge-description">Challenge Description</a></li><li class="nested"><a href="#flag">Flag</a></li><li class="nested"><a href="#analysis-and-solution">Analysis and Solution</a></li><li class="nested"><a href="#solver-script">Solver Script</a></li></ol></aside></main><footer class="site-footer"><div><span>k3ng.xyz</span><span class="footer-note">2026</span></div></footer><script>
+      document.querySelector('.theme-toggle')?.addEventListener('click', () => {
+        const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+        const updateTheme = () => {
+          document.documentElement.dataset.theme = theme;
+          localStorage.setItem('theme', theme);
+        };
+
+        if (document.startViewTransition) {
+          document.startViewTransition(updateTheme);
+          return;
+        }
+
+        document.documentElement.classList.add('theme-transition');
+        updateTheme();
+        setTimeout(() => document.documentElement.classList.remove('theme-transition'), 650);
+      });
+    </script></body></html>

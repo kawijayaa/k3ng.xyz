@@ -1,0 +1,35 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="CTF writeups, digital forensics, and cyber security notes by k3ng."><meta name="generator" content="Astro v7.1.1"><meta property="og:title" content="Frontier Exposed | k3ng.xyz"><meta property="og:description" content="CTF writeups, digital forensics, and cyber security notes by k3ng."><meta property="og:type" content="website"><link rel="icon" type="image/jpeg" href="/favicon.jpg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"><title>Frontier Exposed | k3ng.xyz</title><script>
+      const savedTheme = localStorage.getItem('theme');
+      const preferredTheme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.dataset.theme = savedTheme || preferredTheme;
+    </script><link rel="stylesheet" href="/_astro/BaseLayout.DZwBvaeU.css"></head><body><header class="site-header"><div class="header-inner"><a class="wordmark" href="/" aria-label="Home">k3ng</a><nav aria-label="Primary navigation"><a href="/blog">Blog</a><a href="/writeups" aria-current="page">Writeups</a><a href="/about">About</a></nav><button class="theme-toggle" type="button" aria-label="Toggle color theme"><span class="theme-light" aria-hidden="true">☼</span><span class="theme-dark" aria-hidden="true">☾</span></button></div></header><main class="article-shell has-toc"><article><header class="article-header"><p class="eyebrow">HTB University CTF 2024: Binary Badlands</p><h1>Frontier Exposed</h1><ul class="article-tags" aria-label="Article tags"><li>directory-listing</li><li>bash-history</li><li>credential-exposure</li><li>command-and-control</li><li>base64</li></ul></header><div class="prose"><h3 id="challenge-description">Challenge Description</h3>
+<p>The chaos within the Frontier Cluster is relentless, with malicious actors exploiting vulnerabilities to establish footholds across the expanse. During routine surveillance, an open directory vulnerability was identified on a web server, suggesting suspicious activities tied to the Frontier Board. Your mission is to thoroughly investigate the server and determine a strategy to dismantle their infrastructure. Any credentials uncovered during the investigation would prove invaluable in achieving this objective. Spawn the docker and start the investigation!</p>
+<h3 id="flag">Flag</h3>
+<p><code>HTB{C2_cr3d3nt14ls_3xp0s3d}</code></p>
+<hr>
+<h3 id="analysis">Analysis</h3>
+<p>We are given a website that contains a directory listing for presumably a home directory.</p>
+<p><img src="/images/frontier_exposed/frontier_exposed_1.png" alt=""></p>
+<p>Let’s see the <code>.bash_history</code>file to see what commands has been executed.</p>
+<p><img src="/images/frontier_exposed/frontier_exposed_2.png" alt=""></p>
+<h3 id="solution">Solution</h3>
+<p>There is a suspicious Base64 string when running the C2 client. Let’s try to decode that.</p>
+<p><img src="/images/frontier_exposed/frontier_exposed_3.png" alt=""></p>
+<p>And we got the flag!</p></div></article><aside class="toc" aria-label="On this page"><p>On this page</p><ol><li class="nested"><a href="#challenge-description">Challenge Description</a></li><li class="nested"><a href="#flag">Flag</a></li><li class="nested"><a href="#analysis">Analysis</a></li><li class="nested"><a href="#solution">Solution</a></li></ol></aside></main><footer class="site-footer"><div><span>k3ng.xyz</span><span class="footer-note">2026</span></div></footer><script>
+      document.querySelector('.theme-toggle')?.addEventListener('click', () => {
+        const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+        const updateTheme = () => {
+          document.documentElement.dataset.theme = theme;
+          localStorage.setItem('theme', theme);
+        };
+
+        if (document.startViewTransition) {
+          document.startViewTransition(updateTheme);
+          return;
+        }
+
+        document.documentElement.classList.add('theme-transition');
+        updateTheme();
+        setTimeout(() => document.documentElement.classList.remove('theme-transition'), 650);
+      });
+    </script></body></html>

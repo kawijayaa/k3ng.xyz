@@ -1,0 +1,41 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import CategoryIcon from './CategoryIcon.astro';
+import { categoryNames, cleanId, writeupPath } from '../lib/content';
+
+interface Props {
+  entries: CollectionEntry<'writeups'>[];
+  competitions: CollectionEntry<'writeups'>[];
+  showCompetition?: boolean;
+  showCategory?: boolean;
+}
+
+const { entries, competitions, showCompetition = false, showCategory = true } = Astro.props;
+const competitionById = new Map(
+  competitions.map((entry) => [cleanId(entry.id).replace(/\/index$/, ''), entry.data.title]),
+);
+---
+
+<div class:list={['writeup-list', showCompetition && 'with-competitions', !showCategory && 'without-categories']}>
+  {entries.map((entry) => {
+    const id = cleanId(entry.id);
+    const parent = id.split('/').slice(0, -1).join('/');
+    const icon = entry.data.icon ?? 'Fingerprint';
+    return (
+      <a class="writeup-row" href={writeupPath(entry)}>
+        <span class="category-symbol"><CategoryIcon icon={icon} /></span>
+        <span class="writeup-main">
+          <span class="writeup-name">{entry.data.title}</span>
+          {entry.data.tags && (
+            <span class="writeup-tags">
+              {entry.data.tags.slice(0, 3).map((tag) => <span>{tag}</span>)}
+            </span>
+          )}
+        </span>
+        {showCompetition && <span class="competition-name">{competitionById.get(parent)}</span>}
+        {showCategory && <span class="category-name">{categoryNames[icon]}</span>}
+        <span class="row-arrow" aria-hidden="true">→</span>
+      </a>
+    );
+  })}
+</div>

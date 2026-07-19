@@ -1,0 +1,92 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="CTF writeups, digital forensics, and cyber security notes by k3ng."><meta name="generator" content="Astro v7.1.1"><meta property="og:title" content="P2PWannabe | k3ng.xyz"><meta property="og:description" content="CTF writeups, digital forensics, and cyber security notes by k3ng."><meta property="og:type" content="website"><link rel="icon" type="image/jpeg" href="/favicon.jpg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"><title>P2PWannabe | k3ng.xyz</title><script>
+      const savedTheme = localStorage.getItem('theme');
+      const preferredTheme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.dataset.theme = savedTheme || preferredTheme;
+    </script><link rel="stylesheet" href="/_astro/BaseLayout.DZwBvaeU.css"></head><body><header class="site-header"><div class="header-inner"><a class="wordmark" href="/" aria-label="Home">k3ng</a><nav aria-label="Primary navigation"><a href="/blog">Blog</a><a href="/writeups" aria-current="page">Writeups</a><a href="/about">About</a></nav><button class="theme-toggle" type="button" aria-label="Toggle color theme"><span class="theme-light" aria-hidden="true">☼</span><span class="theme-dark" aria-hidden="true">☾</span></button></div></header><main class="article-shell has-toc"><article><header class="article-header"><p class="eyebrow">Cyber Jawara International 2024</p><h1>P2PWannabe</h1><ul class="article-tags" aria-label="Article tags"><li>pcap-analysis</li><li>protocol-reversing</li><li>zlib</li><li>ocr</li><li>png</li></ul></header><div class="prose"><h3 id="challenge-description">Challenge Description</h3>
+<p>Author: Blacowhait</p>
+<p>Uruzic is a protocol network maniac! he want make protocol byself by combine 2 protocol he loved! P2P and multiplex! in this time he just implement like transfer file as usual between server and client, but adapt behavior of 2 protocol he loved! can you get file inside this traffic with protocol he created?!</p>
+<h3 id="flag">Flag</h3>
+<p><code>CJ{i_wanna_make_this_protocol_running_properly}</code></p>
+<hr>
+<h3 id="analysis-and-solution">Analysis and Solution</h3>
+<p>We are given a network packet capture file, and this challenge doesn’t really give us any hints on what to do. After searching for hours, we dumped the TCP stream and used good ol’ <code>binwalk</code> on it and found that the data is sent using the zlib compression.</p>
+<p><img src="/images/p2pwannabe/p2pwannabe_1.png" alt="Binwalk output of TCP stream dump"></p>
+<p>From the first packet sent, we can see we have 8 bytes of data (presumably a header of some sort) before the zlib header. After some trial-and-error, we found that the last two bytes of the header has a unique value for every chunk, therefore it could mean that this value is the sequence or index. Since the chunks are divided into multiple packets, we need a script to parse and assemble them.</p>
+<p>After getting all the Zlib datas and decompressing them, we got around ~1900 PNG files containing what seems to be hexadecimal.</p>
+<p><img src="/images/p2pwannabe/p2pwannabe_2.png" alt="Extracted PNG images"></p>
+<p>Since we have a f*ck-ton of images and there is no way that we will do this manually, we need to create a script to extract the characters using OCR. After extracting the hexadecimals and converting them, we will get the flag somewhere inside the text.</p>
+<h3 id="solver-script">Solver Script</h3>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="python"><code><span class="line"><span style="color:#FF7B72">import</span><span style="color:#E6EDF3"> zlib</span></span>
+<span class="line"><span style="color:#FF7B72">import</span><span style="color:#E6EDF3"> re</span></span>
+<span class="line"><span style="color:#FF7B72">import</span><span style="color:#E6EDF3"> pytesseract</span></span>
+<span class="line"><span style="color:#FF7B72">import</span><span style="color:#E6EDF3"> os</span></span>
+<span class="line"><span style="color:#FF7B72">from</span><span style="color:#E6EDF3"> scapy.all </span><span style="color:#FF7B72">import</span><span style="color:#FF7B72"> *</span></span>
+<span class="line"><span style="color:#FF7B72">from</span><span style="color:#79C0FF"> PIL</span><span style="color:#FF7B72"> import</span><span style="color:#E6EDF3"> Image</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#8B949E"># Parse packets</span></span>
+<span class="line"><span style="color:#E6EDF3">packets </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> rdpcap(</span><span style="color:#A5D6FF">"./uruzic.pcapng"</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">data </span><span style="color:#FF7B72">=</span><span style="color:#FF7B72"> b</span><span style="color:#A5D6FF">""</span></span>
+<span class="line"><span style="color:#FF7B72">for</span><span style="color:#E6EDF3"> p </span><span style="color:#FF7B72">in</span><span style="color:#E6EDF3"> packets:</span></span>
+<span class="line"><span style="color:#FF7B72">    if</span><span style="color:#E6EDF3"> p.haslayer(</span><span style="color:#79C0FF">TCP</span><span style="color:#E6EDF3">) </span><span style="color:#FF7B72">and</span><span style="color:#E6EDF3"> p.haslayer(Raw) </span><span style="color:#FF7B72">and</span><span style="color:#E6EDF3"> p.getlayer(</span><span style="color:#79C0FF">TCP</span><span style="color:#E6EDF3">).dport </span><span style="color:#FF7B72">==</span><span style="color:#79C0FF"> 8081</span><span style="color:#FF7B72"> and</span><span style="color:#E6EDF3"> p.getlayer(</span><span style="color:#79C0FF">TCP</span><span style="color:#E6EDF3">).flags </span><span style="color:#FF7B72">==</span><span style="color:#FF7B72"> 0x</span><span style="color:#79C0FF">18</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#E6EDF3">        data </span><span style="color:#FF7B72">+=</span><span style="color:#E6EDF3"> p.getlayer(Raw).load</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">offsets </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> [m.start()</span><span style="color:#FF7B72">-</span><span style="color:#79C0FF">8</span><span style="color:#FF7B72"> for</span><span style="color:#E6EDF3"> m </span><span style="color:#FF7B72">in</span><span style="color:#E6EDF3"> re.finditer(</span><span style="color:#FF7B72">b</span><span style="color:#A5D6FF">"</span><span style="color:#FF7B72">\x78\x9c</span><span style="color:#A5D6FF">"</span><span style="color:#E6EDF3">, data)]</span></span>
+<span class="line"><span style="color:#E6EDF3">chunks </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> []</span></span>
+<span class="line"><span style="color:#FF7B72">for</span><span style="color:#E6EDF3"> i </span><span style="color:#FF7B72">in</span><span style="color:#79C0FF"> range</span><span style="color:#E6EDF3">(</span><span style="color:#79C0FF">len</span><span style="color:#E6EDF3">(offsets)</span><span style="color:#FF7B72">-</span><span style="color:#79C0FF">1</span><span style="color:#E6EDF3">):</span></span>
+<span class="line"><span style="color:#FF7B72">    if</span><span style="color:#E6EDF3"> offsets[i] </span><span style="color:#FF7B72">==</span><span style="color:#79C0FF"> len</span><span style="color:#E6EDF3">(offsets)</span><span style="color:#FF7B72">-</span><span style="color:#79C0FF">1</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#FF7B72">        break</span></span>
+<span class="line"><span style="color:#E6EDF3">    header </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> data[offsets[i]:offsets[i]</span><span style="color:#FF7B72">+</span><span style="color:#79C0FF">8</span><span style="color:#E6EDF3">]</span></span>
+<span class="line"><span style="color:#E6EDF3">    seq </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> struct.unpack(</span><span style="color:#A5D6FF">">H"</span><span style="color:#E6EDF3">, header[</span><span style="color:#79C0FF">6</span><span style="color:#E6EDF3">:</span><span style="color:#79C0FF">8</span><span style="color:#E6EDF3">])[</span><span style="color:#79C0FF">0</span><span style="color:#E6EDF3">]</span></span>
+<span class="line"><span style="color:#E6EDF3">    zlib_data </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> data[offsets[i]</span><span style="color:#FF7B72">+</span><span style="color:#79C0FF">8</span><span style="color:#E6EDF3">:offsets[i</span><span style="color:#FF7B72">+</span><span style="color:#79C0FF">1</span><span style="color:#E6EDF3">]]</span></span>
+<span class="line"><span style="color:#E6EDF3">    chunks.append((header, zlib_data, seq))</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">for</span><span style="color:#E6EDF3"> c </span><span style="color:#FF7B72">in</span><span style="color:#E6EDF3"> chunks:</span></span>
+<span class="line"><span style="color:#E6EDF3">    z </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> c[</span><span style="color:#79C0FF">1</span><span style="color:#E6EDF3">]</span></span>
+<span class="line"><span style="color:#FF7B72">    try</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#E6EDF3">        decompressed </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> zlib.decompress(z)</span></span>
+<span class="line"><span style="color:#FF7B72">        with</span><span style="color:#79C0FF"> open</span><span style="color:#E6EDF3">(</span><span style="color:#FF7B72">f</span><span style="color:#A5D6FF">"./dumps/dump</span><span style="color:#FF7B72">{</span><span style="color:#E6EDF3">c[</span><span style="color:#79C0FF">2</span><span style="color:#E6EDF3">]</span><span style="color:#FF7B72">}</span><span style="color:#A5D6FF">.png"</span><span style="color:#E6EDF3">, </span><span style="color:#A5D6FF">"wb"</span><span style="color:#E6EDF3">) </span><span style="color:#FF7B72">as</span><span style="color:#E6EDF3"> f:</span></span>
+<span class="line"><span style="color:#E6EDF3">            f.write(decompressed)</span></span>
+<span class="line"><span style="color:#FF7B72">    except</span><span style="color:#E6EDF3"> zlib.error:</span></span>
+<span class="line"><span style="color:#FF7B72">        pass</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#8B949E"># Get image text</span></span>
+<span class="line"><span style="color:#FF7B72">def</span><span style="color:#D2A8FF"> atoi</span><span style="color:#E6EDF3">(text):</span></span>
+<span class="line"><span style="color:#FF7B72">    return</span><span style="color:#79C0FF"> int</span><span style="color:#E6EDF3">(text) </span><span style="color:#FF7B72">if</span><span style="color:#E6EDF3"> text.isdigit() </span><span style="color:#FF7B72">else</span><span style="color:#E6EDF3"> text</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">def</span><span style="color:#D2A8FF"> natural_keys</span><span style="color:#E6EDF3">(text):</span></span>
+<span class="line"><span style="color:#FF7B72">    return</span><span style="color:#E6EDF3"> [ atoi(c) </span><span style="color:#FF7B72">for</span><span style="color:#E6EDF3"> c </span><span style="color:#FF7B72">in</span><span style="color:#E6EDF3"> re.split(</span><span style="color:#FF7B72">r</span><span style="color:#A5D6FF">'</span><span style="color:#79C0FF">(\d</span><span style="color:#FF7B72">+</span><span style="color:#79C0FF">)</span><span style="color:#A5D6FF">'</span><span style="color:#E6EDF3">, text) ]</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">res </span><span style="color:#FF7B72">=</span><span style="color:#A5D6FF"> ""</span></span>
+<span class="line"><span style="color:#FF7B72">for</span><span style="color:#FFA657"> file</span><span style="color:#FF7B72"> in</span><span style="color:#79C0FF"> sorted</span><span style="color:#E6EDF3">(os.listdir(</span><span style="color:#A5D6FF">"./dumps"</span><span style="color:#E6EDF3">), </span><span style="color:#FFA657">key</span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3">natural_keys):</span></span>
+<span class="line"><span style="color:#FF7B72">    if</span><span style="color:#FFA657"> file</span><span style="color:#E6EDF3">.endswith(</span><span style="color:#A5D6FF">".png"</span><span style="color:#E6EDF3">):</span></span>
+<span class="line"><span style="color:#E6EDF3">        seq </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> atoi(re.search(</span><span style="color:#FF7B72">r</span><span style="color:#A5D6FF">"dump</span><span style="color:#79C0FF">(\d</span><span style="color:#FF7B72">+</span><span style="color:#79C0FF">)</span><span style="color:#7EE787;font-weight:bold">\.</span><span style="color:#A5D6FF">png"</span><span style="color:#E6EDF3">, </span><span style="color:#FFA657">file</span><span style="color:#E6EDF3">).group(</span><span style="color:#79C0FF">1</span><span style="color:#E6EDF3">))</span></span>
+<span class="line"><span style="color:#79C0FF">        print</span><span style="color:#E6EDF3">(seq)</span></span>
+<span class="line"><span style="color:#E6EDF3">        img </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> Image.open(</span><span style="color:#FF7B72">f</span><span style="color:#A5D6FF">"./dumps/</span><span style="color:#FF7B72">{</span><span style="color:#FFA657">file</span><span style="color:#FF7B72">}</span><span style="color:#A5D6FF">"</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">        text </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> pytesseract.image_to_string(img, </span><span style="color:#FFA657">config</span><span style="color:#FF7B72">=</span><span style="color:#A5D6FF">'--psm 10'</span><span style="color:#E6EDF3">).strip()</span></span>
+<span class="line"><span style="color:#FF7B72">        if</span><span style="color:#E6EDF3"> text </span><span style="color:#FF7B72">==</span><span style="color:#A5D6FF"> "i.)"</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#E6EDF3">            text </span><span style="color:#FF7B72">=</span><span style="color:#A5D6FF"> "5"</span></span>
+<span class="line"><span style="color:#FF7B72">        if</span><span style="color:#E6EDF3"> text </span><span style="color:#FF7B72">==</span><span style="color:#A5D6FF"> "F;"</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#E6EDF3">            text </span><span style="color:#FF7B72">=</span><span style="color:#A5D6FF"> "E"</span></span>
+<span class="line"><span style="color:#E6EDF3">        res </span><span style="color:#FF7B72">+=</span><span style="color:#E6EDF3"> text</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">final </span><span style="color:#FF7B72">=</span><span style="color:#A5D6FF"> ''</span><span style="color:#E6EDF3">.join([</span><span style="color:#79C0FF">chr</span><span style="color:#E6EDF3">(</span><span style="color:#79C0FF">int</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">''</span><span style="color:#E6EDF3">.join(c), </span><span style="color:#79C0FF">16</span><span style="color:#E6EDF3">)) </span><span style="color:#FF7B72">for</span><span style="color:#E6EDF3"> c </span><span style="color:#FF7B72">in</span><span style="color:#79C0FF"> zip</span><span style="color:#E6EDF3">(res[</span><span style="color:#79C0FF">0</span><span style="color:#E6EDF3">::</span><span style="color:#79C0FF">2</span><span style="color:#E6EDF3">],res[</span><span style="color:#79C0FF">1</span><span style="color:#E6EDF3">::</span><span style="color:#79C0FF">2</span><span style="color:#E6EDF3">])]) </span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#79C0FF">print</span><span style="color:#E6EDF3">(re.findall(</span><span style="color:#FF7B72">r</span><span style="color:#A5D6FF">"CJ{</span><span style="color:#79C0FF">.</span><span style="color:#FF7B72">*</span><span style="color:#A5D6FF">}"</span><span style="color:#E6EDF3">, final)[</span><span style="color:#79C0FF">0</span><span style="color:#E6EDF3">])</span></span>
+<span class="line"></span></code></pre></div></article><aside class="toc" aria-label="On this page"><p>On this page</p><ol><li class="nested"><a href="#challenge-description">Challenge Description</a></li><li class="nested"><a href="#flag">Flag</a></li><li class="nested"><a href="#analysis-and-solution">Analysis and Solution</a></li><li class="nested"><a href="#solver-script">Solver Script</a></li></ol></aside></main><footer class="site-footer"><div><span>k3ng.xyz</span><span class="footer-note">2026</span></div></footer><script>
+      document.querySelector('.theme-toggle')?.addEventListener('click', () => {
+        const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+        const updateTheme = () => {
+          document.documentElement.dataset.theme = theme;
+          localStorage.setItem('theme', theme);
+        };
+
+        if (document.startViewTransition) {
+          document.startViewTransition(updateTheme);
+          return;
+        }
+
+        document.documentElement.classList.add('theme-transition');
+        updateTheme();
+        setTimeout(() => document.documentElement.classList.remove('theme-transition'), 650);
+      });
+    </script></body></html>

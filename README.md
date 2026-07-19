@@ -1,45 +1,40 @@
 # k3ng.xyz
 
-This is a Next.js application generated with
-[Create Fumadocs](https://github.com/fuma-nama/fumadocs).
+A static, Markdown-first personal website built with Astro.
 
-Run development server:
+## Develop
 
 ```bash
+npm install
 npm run dev
-# or
-pnpm dev
-# or
-yarn dev
 ```
 
-Open http://localhost:3000 with your browser to see the result.
+## Add content
 
-## Explore
+- Add blog posts to `content/blog/<slug>.md`.
+- Add writeups to `content/writeups/<year>/<competition>/<slug>.md`.
+- Use `index.md` inside a competition directory for its landing page.
+- Put images in `public/images` and reference them as `/images/...`.
 
-In the project, you can see:
+Blog frontmatter:
 
-- `lib/source.ts`: Code for content source adapter, [`loader()`](https://fumadocs.dev/docs/headless/source-api) provides the interface to access your content.
-- `lib/layout.shared.tsx`: Shared options for layouts, optional but preferred to keep.
+```yaml
+---
+title: Post title
+date: 2026-07-18
+thumbnail: /images/example/thumbnail.jpg
+description: A short summary.
+---
+```
 
-| Route                     | Description                                            |
-| ------------------------- | ------------------------------------------------------ |
-| `app/(home)`              | The route group for your landing page and other pages. |
-| `app/docs`                | The documentation layout and pages.                    |
-| `app/api/search/route.ts` | The Route Handler for search.                          |
+Writeup frontmatter:
 
-### Fumadocs MDX
+```yaml
+---
+title: Challenge name
+icon: Fingerprint
+tags: [memory-forensics, volatility, process-memory]
+---
+```
 
-A `source.config.ts` config file has been included, you can customise different options like frontmatter schema.
-
-Read the [Introduction](https://fumadocs.dev/docs/mdx) for further details.
-
-## Learn More
-
-To learn more about Next.js and Fumadocs, take a look at the following
-resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js
-  features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-- [Fumadocs](https://fumadocs.vercel.app) - learn about Fumadocs
+Supported writeup icons are `Fingerprint` (forensics), `Globe` (web), `Binary` (pwn), and `Server` (Boot2Root). Add two to five lowercase technique or technology tags. Navigation and listing pages are generated from the directory structure.

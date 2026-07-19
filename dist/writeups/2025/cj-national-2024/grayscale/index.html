@@ -1,0 +1,35 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="CTF writeups, digital forensics, and cyber security notes by k3ng."><meta name="generator" content="Astro v7.1.1"><meta property="og:title" content="Grayscale | k3ng.xyz"><meta property="og:description" content="CTF writeups, digital forensics, and cyber security notes by k3ng."><meta property="og:type" content="website"><link rel="icon" type="image/jpeg" href="/favicon.jpg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"><title>Grayscale | k3ng.xyz</title><script>
+      const savedTheme = localStorage.getItem('theme');
+      const preferredTheme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.dataset.theme = savedTheme || preferredTheme;
+    </script><link rel="stylesheet" href="/_astro/BaseLayout.DZwBvaeU.css"></head><body><header class="site-header"><div class="header-inner"><a class="wordmark" href="/" aria-label="Home">k3ng</a><nav aria-label="Primary navigation"><a href="/blog">Blog</a><a href="/writeups" aria-current="page">Writeups</a><a href="/about">About</a></nav><button class="theme-toggle" type="button" aria-label="Toggle color theme"><span class="theme-light" aria-hidden="true">☼</span><span class="theme-dark" aria-hidden="true">☾</span></button></div></header><main class="article-shell has-toc"><article><header class="article-header"><p class="eyebrow">Cyber Jawara National 2024</p><h1>Grayscale</h1><ul class="article-tags" aria-label="Article tags"><li>gif</li><li>file-repair</li><li>hex-editing</li><li>file-format-analysis</li></ul></header><div class="prose"><h3 id="challenge-description">Challenge Description</h3>
+<p>A threat actor hides a secret message on this intentionally-broken GIF.</p>
+<p>Author: farisv</p>
+<h3 id="flag">Flag</h3>
+<p><code>CJ{_s0_15_it_pr0nounc3d_GiF_or_JiF?_}</code></p>
+<hr>
+<h3 id="analysis">Analysis</h3>
+<p>We are given a file that according to the description is a broken GIF file. When opened with a hex editor, the header part of the GIF is filled with <code>FF</code> bytes.</p>
+<p><img src="/images/grayscale/grayscale_1.png" alt=""></p>
+<h3 id="solution">Solution</h3>
+<p>To recover this file, we need to modify the first 16 bytes of the file based on the <a href="https://en.wikipedia.org/wiki/GIF#Example_GIF_file">GIF specification</a>. The reason why we only need to modify the first 16 bytes and not all of the header is that since we can infer from the challenge name that this image will be grayscale, we only need to change the Logical Screen Descriptor and the first two colors of the Global Color Table so that other colors are interpreted as <code>FF</code> or white.</p>
+<p><img src="/images/grayscale/grayscale_2.png" alt=""></p>
+<p>When opening the file with an image viewer after modification, we will see the flag displayed.</p>
+<p><img src="/images/grayscale/grayscale_3.png" alt=""></p></div></article><aside class="toc" aria-label="On this page"><p>On this page</p><ol><li class="nested"><a href="#challenge-description">Challenge Description</a></li><li class="nested"><a href="#flag">Flag</a></li><li class="nested"><a href="#analysis">Analysis</a></li><li class="nested"><a href="#solution">Solution</a></li></ol></aside></main><footer class="site-footer"><div><span>k3ng.xyz</span><span class="footer-note">2026</span></div></footer><script>
+      document.querySelector('.theme-toggle')?.addEventListener('click', () => {
+        const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+        const updateTheme = () => {
+          document.documentElement.dataset.theme = theme;
+          localStorage.setItem('theme', theme);
+        };
+
+        if (document.startViewTransition) {
+          document.startViewTransition(updateTheme);
+          return;
+        }
+
+        document.documentElement.classList.add('theme-transition');
+        updateTheme();
+        setTimeout(() => document.documentElement.classList.remove('theme-transition'), 650);
+      });
+    </script></body></html>

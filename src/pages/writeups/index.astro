@@ -1,0 +1,56 @@
+---
+import { getCollection, render } from 'astro:content';
+import ArticleLayout from '../../layouts/ArticleLayout.astro';
+import WriteupList from '../../components/WriteupList.astro';
+import { cleanId } from '../../lib/content';
+
+const all = await getCollection('writeups');
+const entry = all.find((item) => cleanId(item.id) === 'index');
+if (!entry) throw new Error('Missing content/writeups/index.md');
+const { Content, headings } = await render(entry);
+const competitions = all
+  .filter((item) => cleanId(item.id).endsWith('/index'))
+  .sort((a, b) => (b.data.date?.getTime() ?? 0) - (a.data.date?.getTime() ?? 0));
+const challenges = all
+  .filter((item) => item.data.icon)
+  .sort((a, b) => cleanId(b.id).localeCompare(cleanId(a.id)));
+const competitionYear = (item: (typeof competitions)[number]) =>
+  String(item.data.date?.getUTCFullYear() ?? cleanId(item.id).split('/')[0]);
+const years = [...new Set(competitions.map(competitionYear))]
+  .sort((a, b) => b.localeCompare(a));
+---
+
+<ArticleLayout title={entry.data.title} description={entry.data.description} eyebrow={`${challenges.length} challenges and counting`} headings={headings}>
+  <Content />
+  <div class="writeup-archive">
+    {years.map((year) => {
+      const yearCompetitions = competitions.filter((item) => competitionYear(item) === year);
+      const yearCount = yearCompetitions.reduce((count, competition) => {
+        const parent = cleanId(competition.id).replace(/\/index$/, '');
+        return count + challenges.filter((item) => cleanId(item.id).startsWith(`${parent}/`)).length;
+      }, 0);
+
+      return (
+        <section class="year-group">
+          <header class="year-heading">
+            <h2>{year}</h2>
+            <span>{yearCount} writeups</span>
+          </header>
+          {yearCompetitions.map((competition) => {
+            const parent = cleanId(competition.id).replace(/\/index$/, '');
+            const entries = challenges.filter((item) => cleanId(item.id).startsWith(`${parent}/`));
+            return (
+              <section class="competition-group">
+                <a class="competition-heading" href={`/writeups/${parent}`}>
+                  <h3>{competition.data.title}</h3>
+                  <span>{entries.length} {entries.length === 1 ? 'challenge' : 'challenges'} →</span>
+                </a>
+                <WriteupList entries={entries} competitions={competitions} showCategory={false} />
+              </section>
+            );
+          })}
+        </section>
+      );
+    })}
+  </div>
+</ArticleLayout>

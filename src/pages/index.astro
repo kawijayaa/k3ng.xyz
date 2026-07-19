@@ -1,0 +1,583 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import BlogCard from '../components/BlogCard.astro';
+
+const allPosts = (await getCollection('blog')).sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
+const posts = allPosts.slice(0, 3);
+---
+
+<BaseLayout>
+  <main>
+    <section class="hero">
+      <canvas class="hero-canvas" aria-hidden="true"></canvas>
+      <div class="hero-content">
+        <img class="hero-avatar" src="/profile.png" alt="k3ng's profile picture" />
+        <h1>k3ng</h1>
+        <button class="hero-description" type="button" title="Reroll bio">#1 forensics enjoyer</button>
+        <div class="hero-links" aria-label="Social profiles">
+          <a href="https://linkedin.com/in/muhammadoka" target="_blank" rel="noreferrer">LinkedIn ↗</a>
+          <a href="https://github.com/kawijayaa" target="_blank" rel="noreferrer">GitHub ↗</a>
+          <a href="https://discord.com/users/243690464795033601" target="_blank" rel="noreferrer">Discord ↗</a>
+          <a href="https://ctftime.org/user/147526" target="_blank" rel="noreferrer">CTFtime ↗</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="home-section">
+      <div class="section-heading"><div><p class="eyebrow">Field notes</p><h2>Latest posts</h2></div><a href="/blog">All posts →</a></div>
+      <div class="blog-grid">{posts.map((post) => <BlogCard post={post} />)}</div>
+    </section>
+
+  </main>
+</BaseLayout>
+
+<script>
+  import {
+    AmbientLight,
+    BoxGeometry,
+    BufferAttribute,
+    BufferGeometry,
+    CanvasTexture,
+    Color,
+    ConeGeometry,
+    DirectionalLight,
+    Group,
+    Line,
+    LineBasicMaterial,
+    Mesh,
+    MeshBasicMaterial,
+    MeshStandardMaterial,
+    PerspectiveCamera,
+    Points,
+    PointsMaterial,
+    CatmullRomCurve3,
+    Raycaster,
+    Scene,
+    SphereGeometry,
+    Vector2,
+    Vector3,
+    WebGLRenderer,
+  } from 'three';
+  import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+
+  const canvas = document.querySelector<HTMLCanvasElement>('.hero-canvas');
+  const container = document.querySelector<HTMLElement>('.hero');
+  const description = document.querySelector<HTMLButtonElement>('.hero-description');
+
+  const bios = [
+    'LOGmaxxing 🦅🦅🦅🦅🦅🦅🦅',
+    'Quit CTFs due to major skill issues',
+    '#1 forensics enjoyer',
+    '"How to be a competent DFIR analyst" wait this is not google',
+    'Makes forensics challenges for a living ($0 made btw)',
+    'I still have no idea what is the difference between "has" and "in" in KQL',
+    'Certified CyberChef Professional',
+    'Do people use Autopsy unironically?',
+    'Praying that AI doesn\'t make DFIR obsolete',
+    'RIP Jeopardy CTFs 2000(?)-2026',
+    'strings | grep FLAG{',
+  ];
+
+  if (description) {
+    let currentBio = Math.max(0, bios.indexOf(description.textContent ?? ''));
+    description.addEventListener('click', () => {
+      description.disabled = true;
+      description.classList.add('is-rerolling');
+      window.setTimeout(() => {
+        currentBio = (currentBio + 1 + Math.floor(Math.random() * (bios.length - 1))) % bios.length;
+        description.textContent = bios[currentBio];
+      }, 100);
+      window.setTimeout(() => {
+        description.disabled = false;
+        description.classList.remove('is-rerolling');
+      }, 440);
+    });
+  }
+
+  if (canvas && container) {
+    const renderer = new WebGLRenderer({ canvas, alpha: true, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    renderer.setClearColor(0x000000, 0);
+
+    const scene = new Scene();
+    const camera = new PerspectiveCamera(35, 1, 0.1, 100);
+    camera.position.z = 6;
+
+    const globe = new Group();
+    scene.add(globe);
+
+    const fract = (value: number) => value - Math.floor(value);
+    const fade = (value: number) => value * value * (3 - (2 * value));
+    const hash = (x: number, y: number, z: number) =>
+      fract(Math.sin((x * 127.1) + (y * 311.7) + (z * 74.7)) * 43758.5453);
+    const valueNoise = (x: number, y: number, z: number) => {
+      const ix = Math.floor(x);
+      const iy = Math.floor(y);
+      const iz = Math.floor(z);
+      const fx = fade(fract(x));
+      const fy = fade(fract(y));
+      const fz = fade(fract(z));
+      const mix = (a: number, b: number, amount: number) => a + ((b - a) * amount);
+      const x00 = mix(hash(ix, iy, iz), hash(ix + 1, iy, iz), fx);
+      const x10 = mix(hash(ix, iy + 1, iz), hash(ix + 1, iy + 1, iz), fx);
+      const x01 = mix(hash(ix, iy, iz + 1), hash(ix + 1, iy, iz + 1), fx);
+      const x11 = mix(hash(ix, iy + 1, iz + 1), hash(ix + 1, iy + 1, iz + 1), fx);
+      return mix(mix(x00, x10, fy), mix(x01, x11, fy), fz);
+    };
+    const fractalNoise = (x: number, y: number, z: number) => {
+      let value = 0;
+      let amplitude = 0.55;
+      let frequency = 1.5;
+      for (let octave = 0; octave < 5; octave++) {
+        value += valueNoise(x * frequency, y * frequency, z * frequency) * amplitude;
+        frequency *= 2.05;
+        amplitude *= 0.48;
+      }
+      return value;
+    };
+
+    const planetCanvas = document.createElement('canvas');
+    planetCanvas.width = 256;
+    planetCanvas.height = 128;
+    const planetContext = planetCanvas.getContext('2d');
+    if (planetContext) {
+      const image = planetContext.createImageData(planetCanvas.width, planetCanvas.height);
+      for (let y = 0; y < planetCanvas.height; y++) {
+        const latitude = ((y / (planetCanvas.height - 1)) - 0.5) * Math.PI;
+        for (let x = 0; x < planetCanvas.width; x++) {
+          const longitude = (x / planetCanvas.width) * Math.PI * 2;
+          const scale = 2.35;
+          const noise = fractalNoise(
+            Math.cos(latitude) * Math.cos(longitude) * scale,
+            Math.sin(latitude) * scale,
+            Math.cos(latitude) * Math.sin(longitude) * scale,
+          );
+          const contrast = Math.max(0, Math.min(1, (noise - 0.28) * 1.45));
+          const shade = Math.round(92 + (contrast * 163));
+          const offset = ((y * planetCanvas.width) + x) * 4;
+          image.data[offset] = shade;
+          image.data[offset + 1] = shade;
+          image.data[offset + 2] = shade;
+          image.data[offset + 3] = 255;
+        }
+      }
+      planetContext.putImageData(image, 0, 0);
+    }
+    const planetTexture = new CanvasTexture(planetCanvas);
+    planetTexture.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), 8);
+    const sphereGeometry = new SphereGeometry(1.62, 64, 48);
+    const sphereMaterial = new MeshStandardMaterial({
+      map: planetTexture,
+      bumpMap: planetTexture,
+      bumpScale: 0.045,
+      roughness: 0.72,
+      metalness: 0.04,
+    });
+    globe.add(new Mesh(sphereGeometry, sphereMaterial));
+
+    const particlePositions = new Float32Array(340 * 3);
+    const centerX = 0;
+    for (let index = 0; index < particlePositions.length; index += 3) {
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.asin((Math.random() * 2) - 1);
+      const radius = 2.1 + (Math.random() * 3.5);
+      particlePositions[index] = centerX + radius * Math.cos(phi) * Math.cos(theta) * 1.65;
+      particlePositions[index + 1] = radius * Math.sin(phi) * 1.15;
+      particlePositions[index + 2] = radius * Math.cos(phi) * Math.sin(theta);
+    }
+    const particleGeometry = new BufferGeometry();
+    particleGeometry.setAttribute('position', new BufferAttribute(particlePositions, 3));
+    const particleColors = new Float32Array(particlePositions.length);
+    const particleColorAttribute = new BufferAttribute(particleColors, 3);
+    particleGeometry.setAttribute('color', particleColorAttribute);
+    const starCanvas = document.createElement('canvas');
+    starCanvas.width = 64;
+    starCanvas.height = 64;
+    const starContext = starCanvas.getContext('2d');
+    if (starContext) {
+      const glow = starContext.createRadialGradient(32, 32, 0, 32, 32, 32);
+      glow.addColorStop(0, 'rgba(255, 255, 255, 1)');
+      glow.addColorStop(0.14, 'rgba(237, 223, 255, 0.95)');
+      glow.addColorStop(0.45, 'rgba(185, 151, 255, 0.3)');
+      glow.addColorStop(1, 'rgba(185, 151, 255, 0)');
+      starContext.fillStyle = glow;
+      starContext.fillRect(0, 0, 64, 64);
+    }
+    const starTexture = new CanvasTexture(starCanvas);
+    const particleMaterial = new PointsMaterial({
+      map: starTexture,
+      size: 0.13,
+      transparent: true,
+      opacity: 0.9,
+      depthWrite: false,
+      vertexColors: true,
+    });
+    const particles = new Points(particleGeometry, particleMaterial);
+    scene.add(particles);
+
+    const routeRadius = 1.64;
+    const airRoute = (start: Vector3, end: Vector3, height: number) => {
+      const from = start.clone().normalize();
+      const to = end.clone().normalize();
+      const angle = Math.acos(Math.min(1, Math.max(-1, from.dot(to))));
+      const sine = Math.sin(angle);
+      const points = Array.from({ length: 33 }, (_, index) => {
+        const progress = index / 32;
+        const direction = from.clone().multiplyScalar(Math.sin((1 - progress) * angle) / sine)
+          .add(to.clone().multiplyScalar(Math.sin(progress * angle) / sine));
+        return direction.normalize().multiplyScalar(routeRadius + (height * Math.sin(Math.PI * progress)));
+      });
+      return new CatmullRomCurve3(points);
+    };
+    const routePoints = Array.from({ length: 16 }, (_, index) => {
+      const y = 1 - ((index + 0.5) / 16) * 2;
+      const radius = Math.sqrt(1 - (y * y));
+      const longitude = index * Math.PI * (3 - Math.sqrt(5));
+      return new Vector3(
+        Math.cos(longitude) * radius,
+        y,
+        Math.sin(longitude) * radius,
+      ).multiplyScalar(routeRadius);
+    });
+    const destinationOrder = [10, 12, 14, 8, 15, 9, 11, 13];
+    const paths = destinationOrder.map((destination, index) =>
+      airRoute(routePoints[index], routePoints[destination], 0.38 + ((index % 3) * 0.08)),
+    );
+    const routeMaterials = paths.map(() => new LineBasicMaterial({ transparent: true, opacity: 0.2 }));
+    const routeGeometries = paths.map((path, index) => {
+      const geometry = new BufferGeometry().setFromPoints(path.getPoints(80));
+      globe.add(new Line(geometry, routeMaterials[index]));
+      return geometry;
+    });
+
+    const packetGeometry = new RoundedBoxGeometry(0.19, 0.09, 0.07, 2, 0.018);
+    const headerGeometry = new RoundedBoxGeometry(0.055, 0.096, 0.076, 2, 0.014);
+    const noseGeometry = new ConeGeometry(0.045, 0.07, 3);
+    const hitboxGeometry = new BoxGeometry(0.32, 0.18, 0.18);
+    const hitboxMaterial = new MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
+    const trailGeometry = new SphereGeometry(0.052, 10, 6);
+    const packets = paths.flatMap((path, pathIndex) =>
+      Array.from({ length: 3 }, (_, packetIndex) => {
+        const packet = new Group();
+        const material = new MeshBasicMaterial({ transparent: true, opacity: 0.58 });
+        const headerMaterial = new MeshBasicMaterial({ transparent: true, opacity: 0.96 });
+        const noseMaterial = new MeshBasicMaterial({ transparent: true, opacity: 0.86 });
+        const payload = new Mesh(packetGeometry, material);
+        const header = new Mesh(headerGeometry, headerMaterial);
+        const nose = new Mesh(noseGeometry, noseMaterial);
+        const hitbox = new Mesh(hitboxGeometry, hitboxMaterial);
+        header.position.x = 0.055;
+        nose.position.x = 0.125;
+        nose.rotation.z = -Math.PI / 2;
+        packet.add(payload, header, nose, hitbox);
+        globe.add(packet);
+        const trail = Array.from({ length: 6 }, (_, trailIndex) => {
+          const trailMaterial = new MeshBasicMaterial({
+            transparent: true,
+            opacity: 0.42 * (1 - trailIndex / 6),
+            depthWrite: false,
+          });
+          const particle = new Mesh(trailGeometry, trailMaterial);
+          globe.add(particle);
+          return { particle, material: trailMaterial };
+        });
+        return {
+          path,
+          packet,
+          hitbox,
+          material,
+          headerMaterial,
+          noseMaterial,
+          trail,
+          paletteIndex: pathIndex,
+          offset: (packetIndex / 3) + (pathIndex * 0.07),
+          speed: 0.000055 + (pathIndex * 0.000008),
+          dropped: false,
+          landed: false,
+          fallVelocity: new Vector3(),
+          resumeAt: 0,
+        };
+      }),
+    );
+
+    const ambientLight = new AmbientLight(0xffffff, 0.045);
+    scene.add(ambientLight);
+    const keyLight = new DirectionalLight(0xffffff, 3.1);
+    keyLight.position.set(-5, 2, 6);
+    scene.add(keyLight);
+
+    const velocity = new Vector2();
+    const raycaster = new Raycaster();
+    const forward = new Vector3(1, 0, 0);
+    const tangent = new Vector3();
+    let dragging = false;
+    let moved = false;
+    const dragStart = new Vector2();
+    let elapsed = 0;
+    let frame = 0;
+    let lastInteraction = 0;
+    let hasInteracted = false;
+    let autoRotation = 0.00075;
+    let cameraYaw = 0;
+    let cameraPitch = 0;
+    let hoveredPacket: (typeof packets)[number] | undefined;
+    const paletteOffsets = [
+      [-0.045, 0.08, -0.04],
+      [-0.018, 0.02, 0.08],
+      [0.018, 0.1, 0.02],
+      [0.048, 0.04, 0.14],
+    ] as const;
+    const variant = (base: Color, index: number, lightness = 0) => {
+      const [hue, saturation, paletteLightness] = paletteOffsets[index % paletteOffsets.length];
+      return base.clone().offsetHSL(hue, saturation, paletteLightness + lightness);
+    };
+
+    const updateCamera = () => {
+      const distance = 7.2;
+      const horizontalDistance = Math.cos(cameraPitch) * distance;
+      camera.position.set(
+        globe.position.x + (Math.sin(cameraYaw) * horizontalDistance),
+        globe.position.y + (Math.sin(cameraPitch) * distance),
+        globe.position.z + (Math.cos(cameraYaw) * horizontalDistance),
+      );
+      camera.lookAt(globe.position);
+    };
+
+    const positionPackets = () => {
+      packets.forEach((routePacket) => {
+        const flow = routePacket.offset + (elapsed * routePacket.speed);
+        if (routePacket.dropped && flow < routePacket.resumeAt) return;
+        if (routePacket.dropped) {
+          routePacket.dropped = false;
+          routePacket.landed = false;
+          routePacket.fallVelocity.set(0, 0, 0);
+          routePacket.packet.visible = true;
+          routePacket.packet.rotation.set(0, 0, 0);
+          routePacket.packet.scale.setScalar(1);
+          routePacket.material.opacity = 0.58;
+          routePacket.headerMaterial.opacity = 0.96;
+          routePacket.noseMaterial.opacity = 0.86;
+          routePacket.trail.forEach(({ particle, material }) => {
+            particle.visible = true;
+            material.opacity = 0.42;
+          });
+          updateColor();
+        }
+        const progress = flow % 1;
+        const { packet, path } = routePacket;
+        packet.position.copy(path.getPointAt(progress));
+        tangent.copy(path.getTangentAt(progress)).normalize();
+        packet.quaternion.setFromUnitVectors(forward, tangent);
+        routePacket.trail.forEach(({ particle, material }, trailIndex) => {
+          const trailProgress = progress - ((trailIndex + 1) * 0.012);
+          particle.visible = trailProgress >= 0;
+          if (particle.visible) particle.position.copy(path.getPointAt(trailProgress));
+          material.opacity = 0.42 * (1 - trailIndex / routePacket.trail.length);
+        });
+      });
+    };
+
+    const updateColor = () => {
+      const isDark = document.documentElement.dataset.theme === 'dark';
+      const color = new Color(getComputedStyle(document.documentElement).getPropertyValue('--accent').trim());
+      const globeColor = isDark
+        ? new Color('#9470b2')
+        : new Color('#665078');
+      const starColorBase = isDark ? color : new Color('#716a7a');
+      const routeColorBase = new Color(isDark ? '#7780e8' : '#596db8');
+      const packetColorBase = isDark ? color : new Color('#7047eb');
+      sphereMaterial.color.copy(globeColor);
+      sphereMaterial.emissive.copy(isDark ? color : new Color('#493959'))
+        .offsetHSL(isDark ? 0.035 : 0, 0, isDark ? 0.02 : 0)
+        .multiplyScalar(isDark ? 0.075 : 0.2);
+      sphereMaterial.roughness = isDark ? 0.72 : 0.88;
+      sphereMaterial.metalness = isDark ? 0.04 : 0;
+      ambientLight.intensity = isDark ? 0.018 : 0.3;
+      keyLight.intensity = isDark ? 3.1 : 1.95;
+      particleMaterial.opacity = isDark ? 0.9 : 0.16;
+      particleMaterial.size = isDark ? 0.13 : 0.095;
+      for (let index = 0; index < particlePositions.length / 3; index++) {
+        const starColor = variant(starColorBase, index, (index % 5) * 0.012);
+        particleColorAttribute.setXYZ(index, starColor.r, starColor.g, starColor.b);
+      }
+      particleColorAttribute.needsUpdate = true;
+      routeMaterials.forEach((material, index) => {
+        material.color.copy(variant(routeColorBase, index));
+        material.opacity = isDark ? 0.2 : 0.28;
+      });
+      packets.forEach((packet) => {
+        if (!packet.dropped) {
+          const packetColor = variant(packetColorBase, packet.paletteIndex);
+          packet.material.color.copy(packetColor);
+          packet.headerMaterial.color.copy(packetColor).offsetHSL(-0.008, -0.06, 0.16);
+          packet.noseMaterial.color.copy(packetColor).offsetHSL(0.012, 0.03, 0.1);
+          packet.trail.forEach(({ material }, index) => {
+            material.color.copy(packetColor).offsetHSL(index * -0.004, 0, index * -0.012);
+          });
+        }
+      });
+      renderer.render(scene, camera);
+    };
+
+    const packetAt = (event: PointerEvent) => {
+      const bounds = container.getBoundingClientRect();
+      const pointer = new Vector2(
+        ((event.clientX - bounds.left) / bounds.width) * 2 - 1,
+        -(((event.clientY - bounds.top) / bounds.height) * 2 - 1),
+      );
+      scene.updateMatrixWorld(true);
+      raycaster.setFromCamera(pointer, camera);
+      const hit = raycaster.intersectObjects(
+        packets.filter((packet) => !packet.dropped).map((packet) => packet.hitbox),
+      )[0];
+      return hit ? packets.find(({ hitbox }) => hitbox === hit.object) : undefined;
+    };
+
+    const updatePacketHover = (event: PointerEvent) => {
+      if (dragging) return;
+      const nextPacket = packetAt(event);
+      if (nextPacket === hoveredPacket) return;
+      hoveredPacket?.packet.scale.setScalar(1);
+      nextPacket?.packet.scale.setScalar(1.22);
+      hoveredPacket = nextPacket;
+      container.classList.toggle('has-packet-hover', Boolean(nextPacket));
+    };
+
+    const resize = () => {
+      const { width, height } = container.getBoundingClientRect();
+      renderer.setSize(width, height, false);
+      camera.aspect = width / height;
+      const horizontalShift = width < 700 ? 0.08 : 0.15;
+      camera.setViewOffset(width, height, -width * horizontalShift, 0, width, height);
+      globe.position.x = width < 700 ? 1.35 : 1.62;
+      globe.scale.setScalar(width < 700 ? 0.86 : 1);
+      updateCamera();
+      renderer.render(scene, camera);
+    };
+
+    const beginDrag = (event: PointerEvent) => {
+      if ((event.target as HTMLElement).closest('a, button')) return;
+      dragging = true;
+      hasInteracted = true;
+      lastInteraction = performance.now();
+      moved = false;
+      dragStart.set(event.clientX, event.clientY);
+      velocity.set(0, 0);
+      container.setPointerCapture(event.pointerId);
+      container.classList.add('is-dragging');
+    };
+
+    const drag = (event: PointerEvent) => {
+      if (!dragging) {
+        updatePacketHover(event);
+        return;
+      }
+      lastInteraction = performance.now();
+      if (dragStart.distanceTo(new Vector2(event.clientX, event.clientY)) > 8) moved = true;
+      velocity.set(event.movementY * 0.0032, event.movementX * -0.0045);
+      cameraPitch = Math.max(-0.65, Math.min(0.65, cameraPitch + velocity.x));
+      cameraYaw += velocity.y;
+      updateCamera();
+      renderer.render(scene, camera);
+    };
+
+    const endDrag = (event: PointerEvent) => {
+      if (!dragging) return;
+      dragging = false;
+      lastInteraction = performance.now();
+      container.releasePointerCapture(event.pointerId);
+      container.classList.remove('is-dragging');
+      if (!moved) blockPacket(event);
+    };
+
+    const blockPacket = (event: PointerEvent) => {
+      if ((event.target as HTMLElement).closest('a, button')) return;
+      const packet = packetAt(event);
+      if (!packet) return;
+      packet.dropped = true;
+      packet.landed = false;
+      packet.fallVelocity.set(0, 0, 0);
+      packet.resumeAt = Math.floor(packet.offset + (elapsed * packet.speed)) + 1;
+      const isDark = document.documentElement.dataset.theme === 'dark';
+      packet.material.color.set(isDark ? '#ef476f' : '#c64f62');
+      packet.headerMaterial.color.set(isDark ? '#ff819b' : '#db7887');
+      packet.noseMaterial.color.set(isDark ? '#ff5f7f' : '#d95c70');
+      packet.trail.forEach(({ particle }) => particle.visible = false);
+      packet.packet.scale.setScalar(1);
+      hoveredPacket = undefined;
+      container.classList.remove('has-packet-hover');
+    };
+
+    const animate = (time = 0) => {
+      if (!dragging) {
+        const idle = !hasInteracted || time - lastInteraction > 2200;
+        const targetRotation = idle ? 0.00055 : 0;
+        autoRotation += (targetRotation - autoRotation) * 0.025;
+        cameraPitch = Math.max(-0.65, Math.min(0.65, cameraPitch + velocity.x));
+        cameraYaw += velocity.y + autoRotation;
+        velocity.multiplyScalar(0.94);
+      }
+      updateCamera();
+      elapsed = time;
+      positionPackets();
+      particles.rotation.y -= 0.00012;
+      packets.forEach((packet) => {
+        if (!packet.dropped || packet.landed) return;
+        const gravity = packet.packet.position.clone().normalize().multiplyScalar(-0.0007);
+        packet.fallVelocity.add(gravity);
+        packet.packet.position.add(packet.fallVelocity);
+        packet.packet.rotation.x += 0.08;
+        packet.packet.rotation.z += 0.12;
+        packet.packet.scale.multiplyScalar(0.985);
+        if (packet.packet.position.length() <= 1.64) {
+          packet.landed = true;
+          packet.packet.visible = false;
+        }
+      });
+      renderer.render(scene, camera);
+      frame = requestAnimationFrame(animate);
+    };
+
+    const observer = new MutationObserver(updateColor);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    const resizeObserver = new ResizeObserver(resize);
+    resizeObserver.observe(container);
+    container.addEventListener('pointerdown', beginDrag);
+    container.addEventListener('pointermove', drag, { passive: true });
+    container.addEventListener('pointerup', endDrag);
+    container.addEventListener('pointercancel', endDrag);
+    positionPackets();
+    updateColor();
+    resize();
+    requestAnimationFrame(() => canvas.classList.add('is-ready'));
+    frame = requestAnimationFrame(animate);
+
+    window.addEventListener('pagehide', () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      resizeObserver.disconnect();
+      sphereGeometry.dispose();
+      planetTexture.dispose();
+      particleGeometry.dispose();
+      starTexture.dispose();
+      routeGeometries.forEach((geometry) => geometry.dispose());
+      packetGeometry.dispose();
+      headerGeometry.dispose();
+      noseGeometry.dispose();
+      hitboxGeometry.dispose();
+      trailGeometry.dispose();
+      sphereMaterial.dispose();
+      particleMaterial.dispose();
+      routeMaterials.forEach((material) => material.dispose());
+      hitboxMaterial.dispose();
+      packets.forEach(({ headerMaterial, material, noseMaterial, trail }) => {
+        material.dispose();
+        headerMaterial.dispose();
+        noseMaterial.dispose();
+        trail.forEach(({ material: trailMaterial }) => trailMaterial.dispose());
+      });
+      renderer.dispose();
+    }, { once: true });
+  }
+</script>

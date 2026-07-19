@@ -1,0 +1,51 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="CTF writeups, digital forensics, and cyber security notes by k3ng."><meta name="generator" content="Astro v7.1.1"><meta property="og:title" content="Apolo | k3ng.xyz"><meta property="og:description" content="CTF writeups, digital forensics, and cyber security notes by k3ng."><meta property="og:type" content="website"><link rel="icon" type="image/jpeg" href="/favicon.jpg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"><title>Apolo | k3ng.xyz</title><script>
+      const savedTheme = localStorage.getItem('theme');
+      const preferredTheme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.dataset.theme = savedTheme || preferredTheme;
+    </script><link rel="stylesheet" href="/_astro/BaseLayout.DZwBvaeU.css"></head><body><header class="site-header"><div class="header-inner"><a class="wordmark" href="/" aria-label="Home">k3ng</a><nav aria-label="Primary navigation"><a href="/blog">Blog</a><a href="/writeups" aria-current="page">Writeups</a><a href="/about">About</a></nav><button class="theme-toggle" type="button" aria-label="Toggle color theme"><span class="theme-light" aria-hidden="true">☼</span><span class="theme-dark" aria-hidden="true">☾</span></button></div></header><main class="article-shell has-toc"><article><header class="article-header"><p class="eyebrow">HTB University CTF 2024: Binary Badlands</p><h1>Apolo</h1><ul class="article-tags" aria-label="Article tags"><li>flowise</li><li>authentication-bypass</li><li>mongodb</li><li>rclone</li><li>symlink-attack</li></ul></header><div class="prose"><h3 id="challenge-description">Challenge Description</h3>
+<p>In the lawless expanse of the Frontier Cluster, Apolo serves as a beacon of security, working to safeguard the Frontier Cluster’s assets from bounty hunters.</p>
+<h3 id="flags">Flags</h3>
+<p>User flag: <code>HTB{llm_ex9l01t_4_RC3}</code></p>
+<p>Root flag: <code>HTB{cl0n3_rc3_f1l3}</code></p>
+<hr>
+<h3 id="enumeration">Enumeration</h3>
+<p>We are only given an IP address since this is a red-teaming type challenge. The first thing to do is enumeration using <code>nmap</code>.</p>
+<p><img src="/images/apolo/apolo_1.png" alt=""></p>
+<p>After enumeration, we can see that port 22 and 80 is open. That means we have an SSH server and an HTTP server in this challenge. And we also found the hostname for the IP address (<code>apolo.htb</code>). We need configure our hosts file to redirect the hostname to our given IP.</p>
+<p><img src="/images/apolo/apolo_2.png" alt=""></p>
+<p>When accessing the HTTP server, we are greeted with a static website. I got stuck here for a while until I saw a hyperlink to <code>ai.apolo.htb</code>. </p>
+<p><img src="/images/apolo/apolo_3.png" alt=""></p>
+<p>After setting the new hostname to the same IP and accessing it, we are redirected to a FlowiseAI website, but we are stuck on the login dialog.</p>
+<p><img src="/images/apolo/apolo_4.png" alt=""></p>
+<h3 id="initial-access">Initial Access</h3>
+<p>After searching for vulnerabilities, I found out about <a href="https://www.exploit-db.com/exploits/52001">this authentication bypass exploit</a>, where we can bypass the authentication by capitalizing the <code>api/v1</code> part of the URL. To redirect every request that uses the <code>api/v1</code>, I used Burp Suite to replace every <code>api/v1</code>to <code>API/V1</code>, therefore bypassing the authentication.</p>
+<p><img src="/images/apolo/apolo_5.png" alt=""></p>
+<p>After adding that rule, we can freely access the website. We can find a MongoDB credential on the credentials page. </p>
+<p><img src="/images/apolo/apolo_6.png" alt=""></p>
+<p>The username and password on the MongoDB URL can be used to login to SSH. Then we can get the user flag inside the <code>user.txt</code>file.</p>
+<p><img src="/images/apolo/apolo_7.png" alt=""></p>
+<h3 id="privilege-escalation">Privilege Escalation</h3>
+<p>To find ways to escalate privileges, I tried to see what sudo access the current user has with <code>sudo -l</code>. </p>
+<p><img src="/images/apolo/apolo_8.png" alt=""></p>
+<p>And the results are this user can use sudo for the <code>rclone</code>command. This command is usually used to transfer data from cloud storage providers. I also got stuck in this for quite a while since I assumed that the data must come from a cloud storage. </p>
+<p>But after some research, there is a <a href="https://github.com/rclone/rclone/security/advisories/GHSA-hrxh-9w67-g4cv">vulnerability when moving symlinks</a>. The <code>rclone</code>command will change the permissions of the target of the link instead of the link itself, making it possible to change permissions of files owned by root. I basically just followed the PoC but instead of targeting the <code>/etc/shadow/</code>file, I targeted the entire <code>/root</code>directory. </p>
+<p><img src="/images/apolo/apolo_9.png" alt=""></p>
+<p>After doing the steps in the PoC, I can access the root flag in <code>/root/root.txt</code>and solve the challenge.</p>
+<p><img src="/images/apolo/apolo_10.png" alt=""></p></div></article><aside class="toc" aria-label="On this page"><p>On this page</p><ol><li class="nested"><a href="#challenge-description">Challenge Description</a></li><li class="nested"><a href="#flags">Flags</a></li><li class="nested"><a href="#enumeration">Enumeration</a></li><li class="nested"><a href="#initial-access">Initial Access</a></li><li class="nested"><a href="#privilege-escalation">Privilege Escalation</a></li></ol></aside></main><footer class="site-footer"><div><span>k3ng.xyz</span><span class="footer-note">2026</span></div></footer><script>
+      document.querySelector('.theme-toggle')?.addEventListener('click', () => {
+        const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+        const updateTheme = () => {
+          document.documentElement.dataset.theme = theme;
+          localStorage.setItem('theme', theme);
+        };
+
+        if (document.startViewTransition) {
+          document.startViewTransition(updateTheme);
+          return;
+        }
+
+        document.documentElement.classList.add('theme-transition');
+        updateTheme();
+        setTimeout(() => document.documentElement.classList.remove('theme-transition'), 650);
+      });
+    </script></body></html>
