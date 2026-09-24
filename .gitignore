@@ -27,6 +27,6 @@ yarn-error.log*
 .vercel
 next-env.d.ts
 
-dist/
-
 /dist/
+/.astro/
+/.openai/

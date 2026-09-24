@@ -40,7 +40,7 @@ const { Content, headings } = await render(entry);
 >
   <Content />
   {isCompetition && children.length > 0 && (
-    <section class="challenge-list">
+    <section class="challenge-list" slot="archive">
       <h2>Challenges</h2>
       <WriteupList entries={children} competitions={competitions} />
     </section>
