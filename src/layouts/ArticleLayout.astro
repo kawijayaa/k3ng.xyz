@@ -20,7 +20,7 @@ interface Props {
 }
 
 const { title, description, image, eyebrow, date, endDate, tableOfContents = true, headings = [], tags = [] } = Astro.props;
-const toc = headings.filter(({ depth }) => depth === 2 || depth === 3);
+const toc = headings.filter(({ depth }) => depth === 1 || depth === 2);
 const formatDate = (value: Date) => value.toLocaleDateString('en', {
   year: 'numeric',
   month: 'long',
@@ -30,7 +30,7 @@ const formatDate = (value: Date) => value.toLocaleDateString('en', {
 ---
 
 <BaseLayout title={title} description={description} image={image}>
-  <main id="main-content" class:list={['article-shell', tableOfContents && toc.length > 2 && 'has-toc']}>
+  <main id="main-content" class:list={['article-shell', tableOfContents && 'has-toc']}>
     <article>
       <header class="article-header">
         {eyebrow && <p class="eyebrow">{eyebrow}</p>}
@@ -52,12 +52,12 @@ const formatDate = (value: Date) => value.toLocaleDateString('en', {
       </div>
       <slot name="archive" />
     </article>
-    {tableOfContents && toc.length > 2 && (
+    {tableOfContents && (
       <aside class="toc" aria-label="On this page">
         <p>On this page</p>
         <ol>
           {toc.map((heading) => (
-            <li class:list={{ nested: heading.depth === 3 }}><a href={`#${heading.slug}`}>{heading.text}</a></li>
+            <li class:list={{ nested: heading.depth === 2 }}><a href={`#${heading.slug}`}>{heading.text}</a></li>
           ))}
         </ol>
       </aside>
