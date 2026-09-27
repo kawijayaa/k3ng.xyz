@@ -83,6 +83,12 @@ Prepare a cheatsheet for things that you may need to refer to, such as Windows e
 
 While analysing, keep track of everything you find immediately in Obsidian. When you find an interesting log, document your SIEM query, the log results, timestamps, and other relevant indicators in a note in Obsidian. Don't worry too much if your notes are incoherent for the time being. You can fix that later. The most important thing is to make sure you don't waste time re-analysing things you have already found just because you forgot to take a screenshot or save the SIEM query.
 
+## 6. You Will Not Understand Everything
+
+In a CTF challenge, especially a forensics challenge, the author usually designs the scenario around a specific learning objective. Because of that, the evidence is intentionally placed in such a way that allows you to eventually reconstruct the full attack path.
+
+But it's a different case with real incidents. Sometimes logs can be missing, evidence may not have been collected, and some behaviours may simply leave little to no evidence behind. The whole point of incident response is not to find every single piece of evidence or force everything into a perfect narrative. You should instead focus on what you can actually prove from the evidence you have gathered, while being honest about any blindspots in your analysis.
+
 # Conclusion
 
 The overall package of the course and exam is excellent. It teaches you a lot about defensive security at a relatively affordable price compared to other certifications (looking at you OffSec). The exam itself is incredibly realistic with awesome attack paths, evidence, and a professional report template.
