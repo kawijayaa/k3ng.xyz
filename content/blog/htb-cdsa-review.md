@@ -1,7 +1,7 @@
 ---
 
 title: How to Pass the Hack The Box Certified Defensive Security Analyst Exam (as a CTF Player)
-date: 2026-09-23
+date: 2026-09-27
 thumbnail: /images/htb_cdsa_review/thumbnail.jpg
 description: On the 22nd of September 2026, I received an email from Hack The Box saying that I had successfully passed the Certified Defensive Security Analyst exam. This post will outline my experience and I will share some tips on how to pass this exam from the perspective of an avid forensics CTF player.
 ---
